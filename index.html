@@ -1,0 +1,2917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Family HQ</title>
+  <!-- Tailwind CSS & Google Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Firebase v10.12.2 Compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+
+  <style>
+    :root { --accent: #2b5c43; --accent-soft: #e6f0ec; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; font-family: 'Inter', sans-serif; background: #f1f5f9; color: #0f172a; overflow-x: hidden; }
+    body.kid-mode h1, body.kid-mode h2, body.kid-mode .font-kid { font-family: 'Fredoka', sans-serif; }
+    .app-wrap { width: 100%; margin: 0 auto; min-height: 100vh; padding-bottom: 94px; position: relative; z-index: 10; }
+    body.parent-mode .app-wrap { max-width: 580px; background: rgba(248, 250, 252, 0.94); box-shadow: 0 0 36px rgba(15, 23, 42, 0.08); }
+    body.kid-mode .app-wrap { max-width: 960px; background: rgba(248, 250, 252, 0.91); }
+    .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; z-index: 40; }
+    body.parent-mode .bottom-nav { max-width: 580px; }
+    body.kid-mode .bottom-nav { max-width: 960px; border-radius: 20px 20px 0 0; }
+    .bg-accent { background-color: var(--accent); }
+    .bg-accent-soft { background-color: var(--accent-soft); }
+    .text-accent { color: var(--accent); }
+    .border-accent { border-color: var(--accent); }
+    .tap { transition: transform 0.12s ease; cursor: pointer; }
+    .tap:active { transform: scale(0.96); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Golden Chore Glow */
+    .golden-chore-card {
+      background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+      border: 2px solid #f59e0b;
+      box-shadow: 0 4px 16px rgba(245, 158, 11, 0.18);
+    }
+
+    /* Non-intrusive Seasonal Particle Layer */
+    #seasonAmbientLayer { position: fixed; inset: 0; pointer-events: none; z-index: 25; overflow: hidden; }
+    .ambient-particle {
+      position: absolute; top: -40px; user-select: none; will-change: transform;
+      animation: seasonalDrift linear infinite;
+      filter: drop-shadow(0 2px 4px rgba(15, 23, 42, 0.08));
+    }
+    @keyframes seasonalDrift {
+      0% { transform: translate3d(0, -40px, 0) rotate(0deg); }
+      50% { transform: translate3d(var(--sway, 18px), 52vh, 0) rotate(180deg); }
+      100% { transform: translate3d(0, 108vh, 0) rotate(360deg); }
+    }
+
+    /* Confetti Celebration Canvas */
+    #confettiCanvas { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+  </style>
+</head>
+<body class="parent-mode">
+  <!-- Ambient Seasonal Overlay -->
+  <div id="seasonAmbientLayer" aria-hidden="true"></div>
+
+  <!-- Celebration Confetti Canvas -->
+  <canvas id="confettiCanvas" aria-hidden="true"></canvas>
+
+  <!-- Toast Banner -->
+  <div id="toastBanner" class="fixed top-3 left-1/2 -translate-x-1/2 z-50 hidden px-4 py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-bold shadow-lg max-w-[92vw] text-center"></div>
+
+  <!-- =========================================================
+       LOGIN OVERLAY ("WHO'S CHECKING IN?")
+       ========================================================= -->
+  <div id="loginScreen" class="min-h-screen flex flex-col justify-center items-center px-4 py-8 relative z-10">
+    <div class="w-full max-w-lg bg-white/95 backdrop-blur rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200/80">
+      <div class="flex items-center justify-between gap-2 mb-5">
+        <div class="flex items-center gap-2.5">
+          <div class="w-11 h-11 rounded-2xl bg-[#2b5c43] text-white flex items-center justify-center text-2xl shadow-sm">🏡</div>
+          <div>
+            <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">Family HQ</h1>
+            <p class="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+              <span id="loginSyncDot" class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
+              <span id="loginSyncLabel">Connecting to HQ...</span>
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="loginSeasonBadge" class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-extrabold">🎅 Auto</span>
+          <button id="cancelSwitchBtn" type="button" onclick="cancelProfileSwitch()" class="hidden tap px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold">Back</button>
+        </div>
+      </div>
+
+      <p class="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-3">Who's checking in?</p>
+      <div id="profileGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       4-DIGIT PIN ENTRY MODAL (NO PIN HINTS DISPLAYED)
+       ========================================================= -->
+  <div id="pinModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl border border-slate-100 text-center">
+      <div id="pinAvatar" class="w-16 h-16 rounded-2xl mx-auto mb-3 flex items-center justify-center text-3xl text-white shadow-md"></div>
+      <h2 id="pinTitle" class="text-lg font-extrabold text-slate-900">Enter PIN</h2>
+      <p class="text-xs text-slate-500 font-medium mt-0.5 mb-4">Enter your 4-digit security code</p>
+
+      <div id="pinDots" class="flex justify-center gap-3 mb-4">
+        <span class="w-3.5 h-3.5 rounded-full bg-slate-200"></span>
+        <span class="w-3.5 h-3.5 rounded-full bg-slate-200"></span>
+        <span class="w-3.5 h-3.5 rounded-full bg-slate-200"></span>
+        <span class="w-3.5 h-3.5 rounded-full bg-slate-200"></span>
+      </div>
+      <p id="pinError" class="text-xs font-bold text-rose-600 min-h-[16px] mb-2"></p>
+
+      <div class="grid grid-cols-3 gap-2.5 mb-3">
+        <button type="button" onclick="pressPinDigit('1')" class="tap py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 font-extrabold text-lg text-slate-800">1</button>
+        <button type="button" onclick="pressPinDigit('2')" class="tap py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 font-extrabold text-lg text-slate-800">2</button>
+        <button type="button" onclick="pressPinDigit('3')" class="tap py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 font-extrabold text-lg text-slate-800">3</button>
+        <button type="button" onclick="pressPinDigit('4')" class="tap py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 font-extrabold text-lg text-slate-800">4</button>
+        <button type="button" onclick="pressPinDigit('5')" class="tap py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 font-extrabold text-lg text-slate-800">5</button>
+        <button type="button" onclick="pressPinDigit('6')" class="tap py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 font-extrabold text-lg text-slate-800">6</button>
+        <button type="button" onclick="pressPinDigit('7')" class="tap py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 font-extrabold text-lg text-slate-800">7</button>
+        <button type="button" onclick="pressPinDigit('8')" class="tap py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 font-extrabold text-lg text-slate-800">8</button>
+        <button type="button" onclick="pressPinDigit('9')" class="tap py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 font-extrabold text-lg text-slate-800">9</button>
+        <button type="button" onclick="clearPinInput()" class="tap py-3 rounded-2xl bg-amber-50 text-amber-800 font-bold text-xs">Clear</button>
+        <button type="button" onclick="pressPinDigit('0')" class="tap py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 font-extrabold text-lg text-slate-800">0</button>
+        <button type="button" onclick="backspacePin()" class="tap py-3 rounded-2xl bg-slate-100 text-slate-700 font-bold text-sm">⌫</button>
+      </div>
+      <button type="button" onclick="closePinModal()" class="tap w-full py-2.5 rounded-2xl bg-rose-50 text-rose-700 font-extrabold text-xs">Back to Profiles</button>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       SETTINGS / KID ICON & COLOUR CUSTOMIZER / PIN MANAGER MODAL
+       ========================================================= -->
+  <div id="settingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-5 w-full max-w-md shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 id="settingsModalTitle" class="text-base sm:text-lg font-extrabold text-slate-900">🔑 PIN & HQ Settings</h2>
+        <button type="button" onclick="closeSettingsModal()" class="tap px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-extrabold">Close</button>
+      </div>
+
+      <!-- Kid-Only Icon & Theme Colour Picker -->
+      <div id="kidCustomizerBox" class="hidden bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 space-y-3">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2.5">
+            <div id="kidPreviewAvatar" class="w-12 h-12 rounded-2xl text-white text-2xl flex items-center justify-center shadow-sm">🦄</div>
+            <div>
+              <p class="text-xs font-extrabold text-slate-800">🎨 My Icon & Theme Colour</p>
+              <p id="kidPreviewColourLabel" class="text-[11px] font-bold text-slate-500">Pick your style below</p>
+            </div>
+          </div>
+          <button type="button" onclick="saveKidCustomization()" class="tap px-3.5 py-2 rounded-xl bg-accent text-white text-xs font-extrabold shadow-2xs shrink-0">Save Icon & Colour</button>
+        </div>
+
+        <div>
+          <p class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 mb-1.5">Theme Colour</p>
+          <div id="kidColourSwatches" class="grid grid-cols-9 gap-1.5"></div>
+        </div>
+
+        <div>
+          <p class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 mb-1.5">Profile Icon</p>
+          <div id="kidIconGrid" class="grid grid-cols-6 sm:grid-cols-9 gap-1.5 max-h-44 overflow-y-auto p-1 bg-white rounded-2xl border border-slate-200/70"></div>
+        </div>
+      </div>
+
+      <!-- Change Own PIN -->
+      <div class="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/70">
+        <label class="block text-xs font-extrabold text-slate-700 mb-1.5">Change My 4-Digit PIN</label>
+        <div class="flex gap-2">
+          <input id="newPinInput" type="password" inputmode="numeric" maxlength="4" placeholder="New 4-digit PIN" class="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-sm font-bold tracking-widest bg-white" />
+          <button type="button" onclick="saveOwnPin()" class="tap px-4 py-2 rounded-xl bg-accent text-white text-xs font-extrabold">Save PIN</button>
+        </div>
+      </div>
+
+      <!-- Parent-Only Season Theme Dropdown & Spotlights Preview -->
+      <div id="seasonControlBox" class="hidden bg-slate-50 rounded-2xl p-3.5 border border-slate-200/70 space-y-3">
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="modalSeasonSelect" class="text-xs font-extrabold text-slate-700">🎨 Season Theme</label>
+            <span class="text-[11px] font-semibold text-slate-400">Syncs across all devices</span>
+          </div>
+          <select id="modalSeasonSelect" onchange="setSeasonOverride(this.value)" class="w-full px-3.5 py-2.5 rounded-2xl border border-slate-300 bg-white text-xs sm:text-sm font-extrabold text-slate-800 focus:outline-none focus:border-slate-500">
+            <option value="auto">Auto (By Date)</option>
+            <option value="christmas">🎅 Christmas</option>
+            <option value="winter">❄️ Winter</option>
+            <option value="spring">🌸 Spring</option>
+            <option value="summer">☀️ Summer</option>
+            <option value="autumn">🍂 Autumn</option>
+            <option value="off">🚫 Off (Standard)</option>
+          </select>
+        </div>
+        <div class="pt-2.5 border-t border-slate-200/80 flex items-center justify-between gap-2">
+          <div>
+            <p class="text-xs font-extrabold text-slate-700">✨ Preview Spotlights</p>
+            <p class="text-[11px] text-slate-500">Test Birthday & Xmas banners</p>
+          </div>
+          <button id="previewSpotlightsBtn" type="button" onclick="toggleSpotlightPreview()" class="tap px-3.5 py-1.5 rounded-xl border text-xs font-extrabold bg-white text-slate-700 border-slate-300">Off</button>
+        </div>
+      </div>
+
+      <!-- Parent-Only Family PIN Manager -->
+      <div id="adminPinManagerBox" class="hidden bg-slate-50 rounded-2xl p-3.5 border border-slate-200/70 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-extrabold text-slate-700">🛡️ Family PIN Manager</span>
+          <span class="text-[11px] font-semibold text-slate-400">Default: 1234</span>
+        </div>
+        <div id="familyPinManagerList" class="space-y-1.5"></div>
+      </div>
+
+      <!-- Device Notification Status -->
+      <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200/70 text-xs">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-slate-600">Browser Alerts:</span>
+          <span id="modalAlertState" class="font-extrabold text-slate-800">Checking...</span>
+        </div>
+        <p id="modalTokenState" class="text-[11px] text-slate-400 mt-1 break-all"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MAIN APP SHELL
+       ========================================================= -->
+  <div id="mainApp" class="app-wrap hidden">
+    <!-- Top Sticky Header -->
+    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200/80 px-2.5 sm:px-3.5 py-2.5 flex items-center justify-between gap-1.5">
+      <!-- Left Profile Shortcut -->
+      <button type="button" onclick="openLoginModal()" title="Switch profile" class="tap flex items-center gap-2 min-w-0 text-left rounded-2xl pr-1 py-0.5 hover:bg-slate-100/80">
+        <div id="hdrAvatar" class="w-9 h-9 rounded-2xl text-white flex items-center justify-center text-lg shrink-0 shadow-2xs"></div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-1">
+            <span id="hdrName" class="block font-extrabold text-xs sm:text-sm text-slate-900 truncate leading-tight"></span>
+            <span id="hdrRoleBadge" class="hidden sm:inline-block text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-accent-soft text-accent shrink-0"></span>
+          </div>
+          <p class="text-[10px] font-bold flex items-center gap-1 text-emerald-700 mt-0.5">
+            <span id="hdrSyncDot" class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span id="hdrSyncText">Connected</span>
+          </p>
+        </div>
+      </button>
+
+      <!-- Right Action Controls -->
+      <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        <select id="hdrSeasonSelect" onchange="setSeasonOverride(this.value)" aria-label="Seasonal Theme" title="Seasonal Theme" class="hidden max-w-[108px] sm:max-w-[132px] px-2 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-[11px] sm:text-xs font-extrabold focus:outline-none focus:border-slate-400 cursor-pointer">
+          <option value="auto">Auto (By Date)</option>
+          <option value="christmas">🎅 Christmas</option>
+          <option value="winter">❄️ Winter</option>
+          <option value="spring">🌸 Spring</option>
+          <option value="summer">☀️ Summer</option>
+          <option value="autumn">🍂 Autumn</option>
+          <option value="off">🚫 Off (Standard)</option>
+        </select>
+        <button id="hdrMuteBtn" type="button" onclick="toggleSoundMute()" title="Toggle Sound Effects" class="tap px-2 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-xs font-extrabold">🔊</button>
+        <button id="hdrAlertBtn" type="button" onclick="requestAlertPermission()" class="tap px-2 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-extrabold">🔔 Alerts</button>
+        <button id="hdrSwitchBtn" type="button" onclick="openLoginModal()" class="tap inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-accent-soft border border-accent/25 text-accent text-xs font-extrabold shadow-2xs">🔄 Switch</button>
+        <button id="hdrSettingsBtn" type="button" onclick="openPinSettings()" class="tap px-2.5 py-1.5 rounded-xl bg-slate-100 border border-slate-200/80 text-slate-700 text-xs font-extrabold">🔑 PIN</button>
+      </div>
+    </header>
+
+    <!-- Spotlights Stack (Birthday Week + 30-Day Christmas Countdown) -->
+    <div id="spotlightBanners" class="px-3.5 pt-3 space-y-2 hidden"></div>
+
+    <!-- Personalized Greeting Card (Hidden for Mikey) -->
+    <div id="greetingBanner" class="px-3.5 pt-3 hidden"></div>
+
+    <!-- =======================================================
+         TAB 1: CHAT (WOULD YOU RATHER + FAMILY WALL + REACTIONS)
+         ======================================================= -->
+    <section id="tab-chat" class="px-3.5 pt-3 space-y-3">
+      <!-- Would You Rather? Interactive Family Card (45 Prompts) -->
+      <div id="wouldYouRatherCard" class="bg-gradient-to-br from-indigo-600 via-purple-600 to-fuchsia-600 rounded-3xl p-4 text-white shadow-md space-y-3"></div>
+
+      <!-- Family Wall Header -->
+      <div class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-2xs flex items-center justify-between">
+        <div>
+          <h2 class="text-base sm:text-lg font-extrabold text-slate-900">💬 Family Wall</h2>
+          <p class="text-xs text-slate-500 font-medium">Tap a reaction sticker on any message!</p>
+        </div>
+        <span id="chatCountBadge" class="text-xs font-extrabold px-2.5 py-1 rounded-full bg-accent-soft text-accent">0 messages</span>
+      </div>
+
+      <div id="chatFeed" class="space-y-3 max-h-[50vh] overflow-y-auto pr-0.5"></div>
+
+      <form onsubmit="sendChatMessage(event)" class="bg-white rounded-3xl p-2.5 border border-slate-200/80 shadow-xs flex items-center gap-2">
+        <input id="chatInput" type="text" maxlength="280" placeholder="Write a message to the family..." class="flex-1 px-3 py-2 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-medium focus:outline-none focus:border-slate-400" />
+        <button type="submit" class="tap px-4 py-2.5 rounded-2xl bg-accent text-white text-xs sm:text-sm font-extrabold shrink-0">Send</button>
+      </form>
+    </section>
+
+    <!-- =======================================================
+         TAB 2: PLANS (SCHEDULE)
+         ======================================================= -->
+    <section id="tab-schedule" class="px-3.5 pt-3 space-y-3 hidden">
+      <div class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2">
+        <div>
+          <h2 class="text-base sm:text-lg font-extrabold text-slate-900">📅 Family Plans</h2>
+          <p id="scheduleSelectedLabel" class="text-xs text-slate-500 font-semibold mt-0.5"></p>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <input id="scheduleDatePicker" type="date" onchange="onScheduleDateChange(this.value)" class="px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-slate-50" />
+          <button id="clearEventsBtn" type="button" onclick="clearAllEvents()" class="hidden tap px-2.5 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-extrabold">🗑️ Clear All</button>
+        </div>
+      </div>
+
+      <!-- Fri–Thu Week Strip -->
+      <div id="scheduleWeekStrip" class="grid grid-cols-7 gap-1.5"></div>
+
+      <!-- Parent-Only Add Plan Form -->
+      <form id="addEventForm" onsubmit="addScheduleEvent(event)" class="hidden bg-white rounded-3xl p-4 border border-slate-200/80 shadow-2xs space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-extrabold uppercase tracking-wider text-slate-400">➕ Add Plan</span>
+          <span class="text-[11px] font-bold text-slate-400">Parents only</span>
+        </div>
+
+        <input id="eventTitleInput" type="text" required maxlength="80" placeholder="Event or activity (e.g. Swimming, Football, School Trip)..." class="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-semibold" />
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <select id="eventWhoSelect" class="px-3 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-extrabold text-slate-700"></select>
+
+          <input id="eventTimeInput" type="time" value="16:00" class="px-3 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-extrabold text-slate-700" />
+
+          <select id="eventRepeatSelect" onchange="toggleSpecificDaysPicker('event')" class="col-span-2 sm:col-span-1 px-3 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-extrabold text-slate-700">
+            <option value="once">One-off</option>
+            <option value="daily">Daily</option>
+            <option value="weekdays">Weekdays (Mon–Fri)</option>
+            <option value="weekly">Weekly</option>
+            <option value="fortnightly">Fortnightly</option>
+            <option value="monthly">Monthly</option>
+            <option value="specific">Specific days</option>
+          </select>
+        </div>
+
+        <!-- Specific Days Pill Selector (Fri–Thu) -->
+        <div id="eventSpecificDaysWrap" class="hidden bg-slate-50 rounded-2xl p-3 border border-slate-200/80">
+          <p class="text-[11px] font-extrabold text-slate-500 mb-2">Tap the days this repeats on:</p>
+          <div id="eventDayPills" class="grid grid-cols-7 gap-1.5"></div>
+        </div>
+
+        <button type="submit" class="tap w-full py-2.5 rounded-2xl bg-accent text-white text-xs sm:text-sm font-extrabold shadow-xs">Add to Plans</button>
+      </form>
+
+      <div id="scheduleList" class="space-y-2.5"></div>
+    </section>
+
+    <!-- =======================================================
+         TAB 3: CHORES, GOLDEN CHORES & CONFETTI (FRI–THU 10-STAR CYCLE)
+         ======================================================= -->
+    <section id="tab-chores" class="px-3.5 pt-3 space-y-3 hidden">
+      <div class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2">
+        <div>
+          <h2 class="text-base sm:text-lg font-extrabold text-slate-900">⭐ Chores & Pocket Money</h2>
+          <p id="cycleRangeLabel" class="text-xs text-slate-500 font-semibold mt-0.5">Fri–Thu Cycle (resets Thu 23:59)</p>
+        </div>
+        <div id="parentChoreActions" class="hidden flex items-center gap-1.5">
+          <button type="button" onclick="clearAllChores()" class="tap px-2.5 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-extrabold">🗑️ Clear All</button>
+          <button type="button" onclick="manualResetWeek()" class="tap px-2.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-extrabold">🔄 Reset Week</button>
+        </div>
+      </div>
+
+      <!-- 5-Kid Live Star Scoreboard (Parents Only) -->
+      <div id="kidsStarScoreboard" class="grid grid-cols-5 gap-1.5"></div>
+
+      <!-- Parent-Only Add Chore Form (With Golden Chore Toggle) -->
+      <form id="addChoreForm" onsubmit="addNewChore(event)" class="hidden bg-white rounded-3xl p-4 border border-slate-200/80 shadow-2xs space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-extrabold uppercase tracking-wider text-slate-400">➕ Assign Chore</span>
+          <span class="text-[11px] font-bold text-slate-400">10 ⭐ = Full Pocket Money</span>
+        </div>
+
+        <input id="choreTitleInput" type="text" required maxlength="80" placeholder="Chore name (e.g. Tidy bedroom, Empty dishwasher)..." class="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-semibold" />
+
+        <div class="grid grid-cols-12 gap-2">
+          <select id="choreKidSelect" class="col-span-5 px-3 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-extrabold text-slate-700"></select>
+
+          <select id="choreRepeatSelect" onchange="toggleSpecificDaysPicker('chore')" class="col-span-5 px-3 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-extrabold text-slate-700">
+            <option value="once">One-off</option>
+            <option value="daily" selected>Daily</option>
+            <option value="weekdays">Weekdays (Mon–Fri)</option>
+            <option value="weekly">Weekly</option>
+            <option value="fortnightly">Fortnightly</option>
+            <option value="monthly">Monthly</option>
+            <option value="specific">Specific days</option>
+          </select>
+
+          <input id="choreStarsInput" type="number" min="1" max="10" value="1" title="Base stars per tick" class="col-span-2 px-2 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-extrabold text-center text-slate-700" />
+        </div>
+
+        <!-- Golden Chore Toggle -->
+        <label class="tap flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl bg-amber-50/90 border border-amber-300/80 cursor-pointer">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">✨</span>
+            <div>
+              <p class="text-xs font-extrabold text-amber-900">Golden Chore (+2 Bonus Stars)</p>
+              <p class="text-[10px] font-semibold text-amber-700">Glows gold and awards +2 extra stars when completed</p>
+            </div>
+          </div>
+          <input id="choreGoldenCheckbox" type="checkbox" class="w-5 h-5 accent-amber-500 rounded" />
+        </label>
+
+        <!-- Specific Days Pill Selector (Fri–Thu) -->
+        <div id="choreSpecificDaysWrap" class="hidden bg-slate-50 rounded-2xl p-3 border border-slate-200/80">
+          <p class="text-[11px] font-extrabold text-slate-500 mb-2">Tap the days this chore repeats on:</p>
+          <div id="choreDayPills" class="grid grid-cols-7 gap-1.5"></div>
+        </div>
+
+        <button type="submit" class="tap w-full py-2.5 rounded-2xl bg-accent text-white text-xs sm:text-sm font-extrabold shadow-xs">Assign Chore</button>
+      </form>
+
+      <!-- Kid Filter Pills (Parents Only) -->
+      <div id="choreKidFilterRow" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5"></div>
+
+      <!-- Kid Pocket Money & Chore Tracker Cards -->
+      <div id="choresContainer" class="space-y-3"></div>
+    </section>
+
+    <!-- =======================================================
+         TAB 4: SHOP (SHARED SHOPPING LIST — NO CATEGORIES)
+         ======================================================= -->
+    <section id="tab-shop" class="px-3.5 pt-3 space-y-3 hidden">
+      <div class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2">
+        <div>
+          <h2 class="text-base sm:text-lg font-extrabold text-slate-900">🛒 We're Out Of...</h2>
+          <p class="text-xs text-slate-500 font-medium">Spot something running low? Add it for the next shop</p>
+        </div>
+        <span id="shopNeededBadge" class="text-xs font-extrabold px-2.5 py-1 rounded-full bg-accent-soft text-accent shrink-0">0 needed</span>
+      </div>
+
+      <!-- Quick-Tap Staples -->
+      <div class="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-2xs space-y-2">
+        <p class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">⚡ Quick-Tap Staples</p>
+        <div id="shopStaplePills" class="flex flex-wrap gap-1.5"></div>
+      </div>
+
+      <!-- Custom Item Form (No Categories) -->
+      <form onsubmit="addShoppingItem(event)" class="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-2xs flex items-center gap-2">
+        <input id="shopItemInput" type="text" required maxlength="80" placeholder="Add something we're out of..." class="flex-1 px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-semibold focus:outline-none focus:border-slate-400" />
+        <button type="submit" class="tap px-4 py-2.5 rounded-2xl bg-accent text-white text-xs sm:text-sm font-extrabold shrink-0 shadow-xs">+ Add</button>
+      </form>
+
+      <!-- Need to Buy Checklist -->
+      <div id="shopNeededList" class="space-y-2"></div>
+
+      <!-- In the Trolley (Ticked Items) -->
+      <div id="shopTrolleyWrap" class="hidden space-y-2 pt-1">
+        <div class="flex items-center justify-between px-1">
+          <span id="shopTrolleyTitle" class="text-xs font-extrabold uppercase tracking-wider text-slate-400">✅ In the Trolley (0)</span>
+          <button type="button" onclick="clearTickedShopping()" class="tap px-3 py-1 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-extrabold">Clear Ticked</button>
+        </div>
+        <div id="shopTrolleyList" class="space-y-2"></div>
+      </div>
+    </section>
+
+    <!-- =======================================================
+         TAB 5: ASK (REQUESTS — BIRTHDAY / CHRISTMAS / CLOTHING / SCHOOL / OTHER)
+         ======================================================= -->
+    <section id="tab-requests" class="px-3.5 pt-3 space-y-3 hidden">
+      <div class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2">
+        <div>
+          <h2 class="text-base sm:text-lg font-extrabold text-slate-900">🙋 Family Requests</h2>
+          <p class="text-xs text-slate-500 font-medium">Wishlists, school gear & requests · Declined items auto-delete after 7 days</p>
+        </div>
+        <span id="pendingReqBadge" class="text-xs font-extrabold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 shrink-0">0 pending</span>
+      </div>
+
+      <!-- Request Submission Form -->
+      <form onsubmit="submitRequest(event)" class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-2xs space-y-3">
+        <div>
+          <p class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 mb-2">1. Pick Request Type</p>
+          <div id="requestTypePills" class="flex flex-wrap gap-1.5"></div>
+        </div>
+
+        <div class="space-y-2">
+          <input id="requestTitleInput" type="text" required maxlength="100" placeholder="What would you like to ask for?" class="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-semibold focus:outline-none focus:border-slate-400" />
+          <input id="requestNoteInput" type="text" maxlength="180" placeholder="Optional details, size, colour, or link..." class="w-full px-3.5 py-2 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-medium focus:outline-none focus:border-slate-400" />
+        </div>
+
+        <button type="submit" class="tap w-full py-2.5 rounded-2xl bg-accent text-white text-xs sm:text-sm font-extrabold shadow-xs">Send Request</button>
+      </form>
+
+      <!-- Status Filter Pills -->
+      <div id="requestFilterRow" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5"></div>
+
+      <!-- Requests Feed -->
+      <div id="requestsList" class="space-y-2.5"></div>
+    </section>
+
+    <!-- =======================================================
+         TAB 6: B-DAYS (FAMILY BIRTHDAYS)
+         ======================================================= -->
+    <section id="tab-birthdays" class="px-3.5 pt-3 space-y-3 hidden">
+      <div class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-2xs">
+        <h2 class="text-base sm:text-lg font-extrabold text-slate-900">🎂 Family Birthdays</h2>
+        <p class="text-xs text-slate-500 font-medium">Automatic countdowns and upcoming ages for all 7</p>
+      </div>
+      <div id="birthdaysList" class="space-y-2.5"></div>
+    </section>
+
+    <!-- =========================================================
+         BOTTOM NAVIGATION BAR (6 COMPACT TABS)
+         ========================================================= -->
+    <nav class="bottom-nav bg-white/95 backdrop-blur border-t border-slate-200 px-1 py-1.5 grid grid-cols-6 gap-0.5 shadow-lg">
+      <button type="button" onclick="switchTab('chat')" data-tab="chat" class="nav-btn tap flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-500 relative">
+        <span class="text-base sm:text-lg leading-none">💬</span>
+        <span class="text-[10px] font-extrabold mt-1">Chat</span>
+        <span id="navUnreadDot" class="hidden absolute top-1 right-3 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white"></span>
+      </button>
+      <button type="button" onclick="switchTab('schedule')" data-tab="schedule" class="nav-btn tap flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-500">
+        <span class="text-base sm:text-lg leading-none">📅</span>
+        <span class="text-[10px] font-extrabold mt-1">Plans</span>
+      </button>
+      <button type="button" onclick="switchTab('chores')" data-tab="chores" class="nav-btn tap flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-500">
+        <span class="text-base sm:text-lg leading-none">⭐</span>
+        <span class="text-[10px] font-extrabold mt-1">Chores</span>
+      </button>
+      <button type="button" onclick="switchTab('shop')" data-tab="shop" class="nav-btn tap flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-500 relative">
+        <span class="text-base sm:text-lg leading-none">🛒</span>
+        <span class="text-[10px] font-extrabold mt-1">Shop</span>
+        <span id="navShopCountBadge" class="hidden absolute top-0.5 right-2 min-w-[16px] h-4 px-1 rounded-full bg-emerald-600 text-white text-[9px] font-extrabold flex items-center justify-center ring-2 ring-white">0</span>
+      </button>
+      <button type="button" onclick="switchTab('requests')" data-tab="requests" class="nav-btn tap flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-500 relative">
+        <span class="text-base sm:text-lg leading-none">🙋</span>
+        <span class="text-[10px] font-extrabold mt-1">Ask</span>
+        <span id="navReqBadge" class="hidden absolute top-0.5 right-2 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-extrabold flex items-center justify-center ring-2 ring-white">0</span>
+      </button>
+      <button type="button" onclick="switchTab('birthdays')" data-tab="birthdays" class="nav-btn tap flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-500">
+        <span class="text-base sm:text-lg leading-none">🎂</span>
+        <span class="text-[10px] font-extrabold mt-1">B-Days</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- =========================================================
+       APPLICATION SCRIPT
+       ========================================================= -->
+  <script>
+    // 1. FIREBASE INIT
+    const firebaseConfig = {
+      apiKey: "AIzaSyDummyKeyForFamilyHQWebApp2026",
+      authDomain: "family-hq-eb357.firebaseapp.com",
+      databaseURL: "https://family-hq-eb357-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "family-hq-eb357",
+      storageBucket: "family-hq-eb357.appspot.com",
+      messagingSenderId: "749281635012",
+      appId: "1:749281635012:web:familyhqeb357web"
+    };
+    const VAPID_PUBLIC_KEY = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U";
+    const STATE_DB_PATH = "family_hq_eb357_state";
+    const TOKENS_DB_PATH = "family_hq_eb357/tokens";
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+    let db = null;
+    let messaging = null;
+    try {
+      if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+      if (firebase.messaging && firebase.messaging.isSupported && firebase.messaging.isSupported()) {
+        messaging = firebase.messaging();
+      }
+    } catch (err) {
+      console.warn("Firebase init notice:", err);
+    }
+
+    // 2. PROFILES, KID CUSTOM ICON & COLOUR OPTIONS, GREETINGS & CONSTANTS
+    const BASE_FAMILY_PROFILES = [
+      { id: 'mikey',  name: 'Mikey',  role: 'parent', icon: '🧔', color: '#2b5c43', soft: '#e6f0ec', bday: '09-07', birthYear: 1990 },
+      { id: 'katie',  name: 'Katie',  role: 'parent', icon: '👩', color: '#2b5c43', soft: '#e6f0ec', bday: '10-15', birthYear: 1991 },
+      { id: 'gracie', name: 'Gracie', role: 'kid',    icon: '🦄', color: '#7c3aed', soft: '#ede9fe', bday: '10-09', birthYear: 2010 },
+      { id: 'bella',  name: 'Bella',  role: 'kid',    icon: '🌸', color: '#0284c7', soft: '#e0f2fe', bday: '12-31', birthYear: 2014 },
+      { id: 'jack',   name: 'Jack',   role: 'kid',    icon: '⚡', color: '#ea580c', soft: '#ffedd5', bday: '10-23', birthYear: 2017 },
+      { id: 'elsie',  name: 'Elsie',  role: 'kid',    icon: '🐱', color: '#db2777', soft: '#fce7f3', bday: '07-18', birthYear: 2019 },
+      { id: 'teddy',  name: 'Teddy',  role: 'kid',    icon: '🦖', color: '#16a34a', soft: '#dcfce7', bday: '03-23', birthYear: 2022 }
+    ];
+
+    const KID_ICON_CHOICES = [
+      '🐱', '🐶', '🦖', '🦕', '🦄', '🦊', '🐼', '🐨', '🦁',
+      '🐯', '🐸', '🐵', '🦋', '🐝', '🐞', '🌸', '⭐', '🌈',
+      '🔥', '⚡', '🎮', '⚽', '🏀', '🎨', '🎸', '🚀', '👑',
+      '💎', '🍕', '🍦', '🧁', '🎀', '🧸', '🦸', '🥷', '🧙'
+    ];
+
+    const KID_COLOUR_SWATCHES = [
+      { name: 'Purple',  accent: '#7c3aed', soft: '#ede9fe' },
+      { name: 'Pink',    accent: '#db2777', soft: '#fce7f3' },
+      { name: 'Rose',    accent: '#e11d48', soft: '#ffe4e6' },
+      { name: 'Orange',  accent: '#ea580c', soft: '#ffedd5' },
+      { name: 'Amber',   accent: '#d97706', soft: '#fef3c7' },
+      { name: 'Emerald', accent: '#059669', soft: '#d1fae5' },
+      { name: 'Teal',    accent: '#0d9488', soft: '#ccfbf1' },
+      { name: 'Sky',     accent: '#0284c7', soft: '#e0f2fe' },
+      { name: 'Indigo',  accent: '#4f46e5', soft: '#e0e7ff' }
+    ];
+
+    const PROFILE_GREETINGS = {
+      katie:  "Hey Katie! HQ is officially open—what's the game plan today?",
+      gracie: "Hey Gracie! Quick check-in on plans, shifts, and pocket money.",
+      bella:  "Hey Bella! Let's smash those stars before Thursday night!",
+      jack:   "Yo Jack! Ready to stack up some stars and check what's on?",
+      elsie:  "Hiya Elsie! ✨ Ready to collect sparkly stars today?",
+      teddy:  "ROAR! 💥 Let's go Teddy—time to crush those chores!"
+    };
+
+    const CHAT_REACTIONS = ['😂', '🔥', '❤️', '🦖', '👑', '🙄'];
+
+    // 45 Family-Friendly "Would You Rather?" Prompts
+    const WOULD_YOU_RATHER_PROMPTS = [
+      { a: "Have a pet T-Rex in the back garden 🦖", b: "Have a flying broomstick for school runs 🧹" },
+      { a: "Eat only pizza for a whole month 🍕", b: "Eat only ice cream for a whole month 🍦" },
+      { a: "Be able to turn invisible whenever you want 👻", b: "Be able to read everyone's minds 🧠" },
+      { a: "Live in a giant treehouse in the jungle 🌴", b: "Live in an underwater glass dome 🐠" },
+      { a: "Have legs as springy as a kangaroo 🦘", b: "Have arms as stretchy as rubber bands 🐙" },
+      { a: "Never have to brush your teeth again 🦷", b: "Never have to tidy your bedroom again 🛏️" },
+      { a: "Be able to talk to animals 🐶", b: "Be able to speak every human language 🌍" },
+      { a: "Have snow every single weekend ❄️", b: "Have sunny beach weather every weekend ☀️" },
+      { a: "Swap places with Mum or Dad for a day 🔄", b: "Swap places with your youngest sibling 👶" },
+      { a: "Have a waterslide from your bed to the kitchen 💦", b: "Have a zip-line from your window to the garden 🪢" },
+      { a: "Always have to hop like a bunny everywhere 🐰", b: "Always have to walk backwards everywhere 🚶" },
+      { a: "Discover a secret passage behind your wardrobe 🚪", b: "Find a buried treasure chest in the park 🏴‍☠️" },
+      { a: "Have hair that changes colour with your mood 🌈", b: "Have eyes that glow in the dark like a cat 🐱" },
+      { a: "Only be able to whisper for a week 🤫", b: "Only be able to sing everything you say 🎤" },
+      { a: "Be the fastest runner in the world ⚡", b: "Be the highest jumper in the world 🚀" },
+      { a: "Have unlimited free cinema trips forever 🍿", b: "Have unlimited free theme park rides forever 🎢" },
+      { a: "Fight 100 duck-sized horses 🦆", b: "Fight 1 horse-sized duck 🐎" },
+      { a: "Have a robot that does all your homework 🤖", b: "Have a robot chef that makes any snack 🧁" },
+      { a: "Travel 100 years into the past 🏰", b: "Travel 100 years into the future 🛸" },
+      { a: "Have a tail like a monkey 🐒", b: "Have ears like an elf 🧝" },
+      { a: "Sneeze glitter every time you sneeze ✨", b: "Burp bubbles every time you burp 🫧" },
+      { a: "Be a famous YouTuber or gamer 🎮", b: "Be a world-famous footballer or Olympian 🏆" },
+      { a: "Have Christmas twice a year 🎅", b: "Have two birthdays every year 🎂" },
+      { a: "Live inside your favourite video game 🕹️", b: "Live inside your favourite animated movie 🎬" },
+      { a: "Always wear clown shoes outside 🤡", b: "Always wear a superhero cape outside 🦸" },
+      { a: "Breathe underwater like a mermaid/merman 🧜", b: "Fly through the clouds like a bird 🦅" },
+      { a: "Have marshmallows for pillows ☁️", b: "Have a trampoline for a bedroom floor 🤸" },
+      { a: "Only eat sour sweets forever 🍋", b: "Only eat chocolate forever 🍫" },
+      { a: "Have a pocket-sized elephant 🐘", b: "Have a giant hamster you can ride 🐹" },
+      { a: "Be able to pause time for 10 minutes a day ⏸️", b: "Be able to rewind the last 5 minutes ⏪" },
+      { a: "Have spaghetti for hair 🍝", b: "Have maple syrup sweat 🥞" },
+      { a: "Go camping in the mountains for a week ⛺", b: "Stay in a 5-star hotel with a huge pool 🏨" },
+      { a: "Always have hiccups when you laugh 😆", b: "Always quack like a duck when you yawn 🦆" },
+      { a: "Be a master ninja 🥷", b: "Be a powerful wizard/witch 🧙" },
+      { a: "Have a unicorn as your best mate 🦄", b: "Have a friendly baby dragon 🐉" },
+      { a: "No screens for a whole month 📵", b: "No sweets or chocolate for a whole month 🚫" },
+      { a: "Always smell like freshly baked cookies 🍪", b: "Always smell like bubblegum 🍬" },
+      { a: "Control the weather with your claps ⛈️", b: "Grow plants instantly with your fingers 🌱" },
+      { a: "Have super-strength like the Hulk 💪", b: "Have web-shooters like Spider-Man 🕸️" },
+      { a: "Sleep in a hammock every night 🛌", b: "Sleep in a blanket fort every night 🏕️" },
+      { a: "Win £1,000 right now 💷", b: "Get £10 every single week forever 💰" },
+      { a: "Be able to shrink to the size of an ant 🐜", b: "Be able to grow as tall as a house 🏠" },
+      { a: "Have a personal jetpack 🚀", b: "Have a hoverboard that actually flies 🛹" },
+      { a: "Always have to wear odd socks 🧦", b: "Always have to wear your jumper inside out 👕" },
+      { a: "Design a brand-new flavour of crisps 🥔", b: "Invent a brand-new amusement park ride 🎡" }
+    ];
+
+    const REQUEST_TYPES = [
+      { id: 'Birthday',  label: 'Birthday',  icon: '🎂', badgeBg: '#fef3c7', badgeText: '#92400e' },
+      { id: 'Christmas', label: 'Christmas', icon: '🎄', badgeBg: '#ffe4e6', badgeText: '#9f1239' },
+      { id: 'Clothing',  label: 'Clothing',  icon: '👕', badgeBg: '#e0f2fe', badgeText: '#075985' },
+      { id: 'School',    label: 'School',    icon: '🎒', badgeBg: '#ede9fe', badgeText: '#5b21b6' },
+      { id: 'Other',     label: 'Other',     icon: '✨', badgeBg: '#f1f5f9', badgeText: '#334155' }
+    ];
+
+    const SHOP_STAPLES = [
+      { label: 'Milk', icon: '🥛' },
+      { label: 'Bread', icon: '🍞' },
+      { label: 'Eggs', icon: '🥚' },
+      { label: 'Fruit', icon: '🍎' },
+      { label: 'School Snacks', icon: '🧃' },
+      { label: 'Loo Roll', icon: '🧻' }
+    ];
+
+    const FRI_THU_DAYS = [
+      { dow: 5, short: 'Fri' },
+      { dow: 6, short: 'Sat' },
+      { dow: 0, short: 'Sun' },
+      { dow: 1, short: 'Mon' },
+      { dow: 2, short: 'Tue' },
+      { dow: 3, short: 'Wed' },
+      { dow: 4, short: 'Thu' }
+    ];
+
+    const REPEAT_LABELS = {
+      once: 'One-off',
+      daily: 'Daily',
+      weekdays: 'Weekdays (Mon–Fri)',
+      weekly: 'Weekly',
+      fortnightly: 'Fortnightly',
+      monthly: 'Monthly',
+      specific: 'Specific days'
+    };
+
+    const SEASON_MODES = ['auto', 'christmas', 'winter', 'spring', 'summer', 'autumn', 'off'];
+    const SEASON_CONFIGS = {
+      christmas: {
+        label: '🎅 Christmas',
+        shortIcon: '🎅',
+        particles: ['🎅', '🦌', '🎄', '🎁', '⛄', '❄️'],
+        opacity: 0.65,
+        count: 18
+      },
+      winter: {
+        label: '❄️ Winter',
+        shortIcon: '❄️',
+        particles: ['❄️', '❅', '❆', '✨', '🌨️'],
+        opacity: 0.56,
+        count: 16
+      },
+      spring: {
+        label: '🌸 Spring',
+        shortIcon: '🌸',
+        particles: ['🌸', '🌷', '🌱', '🦋'],
+        opacity: 0.48,
+        count: 14
+      },
+      summer: {
+        label: '☀️ Summer',
+        shortIcon: '☀️',
+        particles: ['☀️', '✨', '🌻', '🍦'],
+        opacity: 0.45,
+        count: 14
+      },
+      autumn: {
+        label: '🍂 Autumn',
+        shortIcon: '🍂',
+        particles: ['🍂', '🍁', '🌰', '🎃'],
+        opacity: 0.52,
+        count: 15
+      },
+      off: {
+        label: '🚫 Off (Standard)',
+        shortIcon: '🚫',
+        particles: [],
+        opacity: 0,
+        count: 0
+      }
+    };
+
+    // 3. STATE & SEEDED PERSISTENCE
+    function toISODate(d) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function getCycleStartISO(refDate = new Date()) {
+      const d = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate());
+      const diffToFri = (d.getDay() - 5 + 7) % 7;
+      d.setDate(d.getDate() - diffToFri);
+      return toISODate(d);
+    }
+
+    function getTodayDayIndex() {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), 0, 0);
+      const dayOfYear = Math.floor((now - start) / 86400000);
+      return dayOfYear % WOULD_YOU_RATHER_PROMPTS.length;
+    }
+
+    function buildDefaultPins() {
+      const pins = {};
+      BASE_FAMILY_PROFILES.forEach(p => { pins[p.id] = '1234'; });
+      return pins;
+    }
+
+    function buildInitialSeedState() {
+      return {
+        seeded: true,
+        cycleStartISO: getCycleStartISO(),
+        seasonOverride: 'auto',
+        previewSpotlights: false,
+        pins: buildDefaultPins(),
+        profileCustomizations: {},
+        wyrIndex: getTodayDayIndex(),
+        wyrVotes: {},
+        messages: [
+          {
+            id: 'msg_welcome_1',
+            senderId: 'mikey',
+            text: 'Welcome to Family HQ! Tap Alerts in the header on each device to stay synced.',
+            reactions: {},
+            ts: Date.now() - 3600000
+          }
+        ],
+        events: [],
+        chores: [],
+        bonusStars: { gracie: 0, bella: 0, jack: 0, elsie: 0, teddy: 0 },
+        celebratedTenStars: {},
+        shopping: [],
+        requests: []
+      };
+    }
+
+    let state = buildInitialSeedState();
+    let currentUser = null;
+    let activeTab = 'chat';
+    let selectedScheduleDate = toISODate(new Date());
+    let selectedChoreKidFilter = 'all';
+    let selectedEventSpecificDays = [5, 1, 3];
+    let selectedChoreSpecificDays = [5, 6, 0, 1, 2, 3, 4];
+    let selectedRequestType = 'Birthday';
+    let selectedRequestStatusFilter = 'all';
+    let pendingPinProfile = null;
+    let enteredPin = '';
+    let draftKidIcon = '🦄';
+    let draftKidAccent = '#7c3aed';
+    let draftKidSoft = '#ede9fe';
+    let lastKnownMessageId = null;
+    let unreadChatCount = 0;
+    let lastRenderedSeasonKey = null;
+    let isSoundMuted = localStorage.getItem('family_hq_muted') === '1';
+
+    function getProfile(id) {
+      const base = BASE_FAMILY_PROFILES.find(p => p.id === id);
+      if (!base) return null;
+      const custom = (state.profileCustomizations && state.profileCustomizations[id]) || null;
+      if (!custom) return { ...base };
+      return {
+        ...base,
+        icon: custom.icon || base.icon,
+        color: custom.accent || custom.color || base.color,
+        soft: custom.soft || base.soft
+      };
+    }
+
+    function getAllProfiles() {
+      return BASE_FAMILY_PROFILES.map(p => getProfile(p.id));
+    }
+
+    function getKidsList() {
+      return getAllProfiles().filter(p => p.role === 'kid');
+    }
+
+    function normalizeArray(rawArr) {
+      if (Array.isArray(rawArr)) return rawArr.filter(Boolean);
+      if (rawArr && typeof rawArr === 'object') return Object.values(rawArr).filter(Boolean);
+      return [];
+    }
+
+    function purgeExpiredDeclinedRequests(reqs) {
+      const now = Date.now();
+      let removedAny = false;
+      const kept = (reqs || []).filter(r => {
+        if (r && r.status === 'declined') {
+          const declinedTimestamp = Number(r.declinedAt || r.ts || now);
+          if ((now - declinedTimestamp) >= SEVEN_DAYS_MS) {
+            removedAny = true;
+            return false;
+          }
+        }
+        return true;
+      });
+      return { kept, removedAny };
+    }
+
+    function normalizeState(raw) {
+      if (!raw || typeof raw !== 'object') return buildInitialSeedState();
+      const pins = Object.assign(buildDefaultPins(), raw.pins || {});
+      const bonusStars = Object.assign({ gracie: 0, bella: 0, jack: 0, elsie: 0, teddy: 0 }, raw.bonusStars || {});
+      const profileCustomizations = (raw.profileCustomizations && typeof raw.profileCustomizations === 'object') ? raw.profileCustomizations : {};
+      const celebratedTenStars = (raw.celebratedTenStars && typeof raw.celebratedTenStars === 'object') ? raw.celebratedTenStars : {};
+      const wyrVotes = (raw.wyrVotes && typeof raw.wyrVotes === 'object') ? raw.wyrVotes : {};
+      const wyrIndex = typeof raw.wyrIndex === 'number' ? (raw.wyrIndex % WOULD_YOU_RATHER_PROMPTS.length) : getTodayDayIndex();
+
+      const rawSeason = raw.seasonOverride || raw.seasonMode || 'auto';
+      const seasonOverride = SEASON_MODES.includes(rawSeason) ? rawSeason : 'auto';
+
+      const messages = normalizeArray(raw.messages).map(m => ({
+        ...m,
+        reactions: (m.reactions && typeof m.reactions === 'object') ? m.reactions : {}
+      }));
+      const events = normalizeArray(raw.events).map(ev => ({
+        ...ev,
+        specificDays: Array.isArray(ev.specificDays) ? ev.specificDays : []
+      }));
+      const chores = normalizeArray(raw.chores).map(c => ({
+        ...c,
+        golden: c.golden === true,
+        ticks: c.ticks && typeof c.ticks === 'object' ? c.ticks : {},
+        specificDays: Array.isArray(c.specificDays) ? c.specificDays : []
+      }));
+      const shopping = normalizeArray(raw.shopping);
+      const rawRequests = normalizeArray(raw.requests).map(r => {
+        const validType = REQUEST_TYPES.some(t => t.id === r.type) ? r.type : 'Other';
+        return {
+          ...r,
+          type: validType,
+          title: r.title || r.text || 'Request',
+          note: r.note || '',
+          status: ['pending', 'saved', 'approved', 'declined'].includes(r.status) ? r.status : 'pending',
+          declinedAt: r.status === 'declined' ? Number(r.declinedAt || r.ts || Date.now()) : null
+        };
+      });
+      const { kept: requests } = purgeExpiredDeclinedRequests(rawRequests);
+
+      return {
+        seeded: true,
+        cycleStartISO: raw.cycleStartISO || getCycleStartISO(),
+        seasonOverride,
+        previewSpotlights: raw.previewSpotlights === true,
+        pins,
+        profileCustomizations,
+        wyrIndex,
+        wyrVotes,
+        messages,
+        events,
+        chores,
+        bonusStars,
+        celebratedTenStars,
+        shopping,
+        requests
+      };
+    }
+
+    function persistState() {
+      state.seeded = true;
+      const { kept } = purgeExpiredDeclinedRequests(state.requests);
+      state.requests = kept;
+
+      try { localStorage.setItem('family_hq_cache_v11', JSON.stringify(state)); } catch (e) {}
+
+      if (db) {
+        const payload = {
+          seeded: true,
+          cycleStartISO: state.cycleStartISO,
+          seasonOverride: state.seasonOverride || 'auto',
+          previewSpotlights: state.previewSpotlights === true,
+          pins: state.pins,
+          profileCustomizations: state.profileCustomizations || {},
+          wyrIndex: state.wyrIndex,
+          wyrVotes: state.wyrVotes || {},
+          bonusStars: state.bonusStars,
+          celebratedTenStars: state.celebratedTenStars || {},
+          _emptyMessages: state.messages.length === 0,
+          messages: state.messages.length ? state.messages : null,
+          _emptyEvents: state.events.length === 0,
+          events: state.events.length ? state.events : null,
+          _emptyChores: state.chores.length === 0,
+          chores: state.chores.length ? state.chores : null,
+          _emptyShopping: state.shopping.length === 0,
+          shopping: state.shopping.length ? state.shopping : null,
+          _emptyRequests: state.requests.length === 0,
+          requests: state.requests.length ? state.requests : null,
+          updatedAt: Date.now()
+        };
+        db.ref(STATE_DB_PATH).set(payload).catch(err => {
+          console.error("Firebase write error:", err);
+          showToast("⚠️ Sync write issue—check connection");
+        });
+      }
+    }
+
+    function checkFridayThursdayRollover(shouldSave = true) {
+      const currentFriISO = getCycleStartISO(new Date());
+      if (state.cycleStartISO !== currentFriISO) {
+        state.cycleStartISO = currentFriISO;
+        state.bonusStars = { gracie: 0, bella: 0, jack: 0, elsie: 0, teddy: 0 };
+        state.celebratedTenStars = {};
+        state.chores = state.chores
+          .filter(c => !(c.repeat === 'once' && c.ticks && c.ticks.done))
+          .map(c => ({ ...c, ticks: {} }));
+        if (shouldSave) persistState();
+      }
+    }
+
+    // 4. WEB AUDIO SOUND EFFECTS ENGINE & CONFETTI BURST
+    function toggleSoundMute() {
+      isSoundMuted = !isSoundMuted;
+      localStorage.setItem('family_hq_muted', isSoundMuted ? '1' : '0');
+      updateMuteButtonUI();
+      if (!isSoundMuted) playSoundEffect('pop');
+      showToast(isSoundMuted ? "🔇 Sound effects muted" : "🔊 Sound effects on");
+    }
+
+    function updateMuteButtonUI() {
+      const btn = document.getElementById('hdrMuteBtn');
+      if (btn) {
+        btn.textContent = isSoundMuted ? '🔇' : '🔊';
+        btn.className = isSoundMuted
+          ? 'tap px-2 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-extrabold'
+          : 'tap px-2 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-xs font-extrabold';
+      }
+    }
+
+    function playSoundEffect(type = 'chime') {
+      if (isSoundMuted) return;
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+
+        if (type === 'pop') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(420, now);
+          osc.frequency.exponentialRampToValueAtTime(760, now + 0.09);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.12);
+        } else if (type === 'roar') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(165, now);
+          osc.frequency.exponentialRampToValueAtTime(68, now + 0.35);
+          gain.gain.setValueAtTime(0.11, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.4);
+        } else if (type === 'fanfare') {
+          const notes = [523.25, 659.25, 783.99, 1046.5];
+          notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + i * 0.09);
+            gain.gain.setValueAtTime(0.1, now + i * 0.09);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.09 + 0.32);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + i * 0.09);
+            osc.stop(now + i * 0.09 + 0.34);
+          });
+        } else {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, now);
+          osc.frequency.exponentialRampToValueAtTime(880, now + 0.14);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.34);
+        }
+      } catch (e) {}
+    }
+
+    let confettiParticles = [];
+    let confettiAnimId = null;
+
+    function launchConfetti() {
+      const canvas = document.getElementById('confettiCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const palette = ['#f59e0b', '#ec4899', '#8b5cf6', '#10b981', '#0284c7', '#ef4444', '#facc15'];
+      confettiParticles = [];
+      for (let i = 0; i < 120; i++) {
+        confettiParticles.push({
+          x: Math.random() * canvas.width,
+          y: -20 - Math.random() * canvas.height * 0.4,
+          w: 7 + Math.random() * 6,
+          h: 4 + Math.random() * 5,
+          vx: (Math.random() - 0.5) * 4.5,
+          vy: 2.8 + Math.random() * 4.2,
+          angle: Math.random() * 360,
+          spin: (Math.random() - 0.5) * 10,
+          color: palette[i % palette.length]
+        });
+      }
+
+      if (confettiAnimId) cancelAnimationFrame(confettiAnimId);
+
+      function step() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let activeCount = 0;
+        confettiParticles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.06;
+          p.angle += p.spin;
+          if (p.y < canvas.height + 30) activeCount++;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate((p.angle * Math.PI) / 180);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          ctx.restore();
+        });
+
+        if (activeCount > 0) {
+          confettiAnimId = requestAnimationFrame(step);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          confettiAnimId = null;
+        }
+      }
+      step();
+    }
+
+    // 5. REALTIME SYNC & NOTIFICATIONS
+    function initRealtimeSync() {
+      try {
+        const cached = localStorage.getItem('family_hq_cache_v11');
+        if (cached) {
+          state = normalizeState(JSON.parse(cached));
+          checkFridayThursdayRollover(false);
+        }
+      } catch (e) {}
+
+      if (!db) {
+        updateSyncIndicator(false, "Offline");
+        return;
+      }
+
+      db.ref(".info/connected").on("value", snap => {
+        const connected = snap.val() === true;
+        updateSyncIndicator(connected, connected ? "Connected" : "Syncing...");
+      });
+
+      db.ref(STATE_DB_PATH).on("value", snap => {
+        const val = snap.val();
+        if (!val) {
+          state = buildInitialSeedState();
+          persistState();
+          renderAll();
+          return;
+        }
+
+        const prevNewest = state.messages.length ? state.messages[state.messages.length - 1] : null;
+        const rawReqCount = normalizeArray(val.requests).length;
+        state = normalizeState(val);
+        checkFridayThursdayRollover(false);
+
+        if (state.requests.length < rawReqCount) {
+          persistState();
+        }
+
+        if (currentUser) {
+          const refreshed = getProfile(currentUser.id);
+          if (refreshed) {
+            currentUser = refreshed;
+            applyActiveUserHeaderAndTheme(currentUser);
+          }
+        }
+
+        const newest = state.messages.length ? state.messages[state.messages.length - 1] : null;
+        if (newest && (!prevNewest || newest.id !== prevNewest.id) && lastKnownMessageId && newest.id !== lastKnownMessageId) {
+          handleIncomingMessageAlert(newest);
+        }
+        if (newest) lastKnownMessageId = newest.id;
+
+        try { localStorage.setItem('family_hq_cache_v11', JSON.stringify(state)); } catch (e) {}
+        renderAll();
+      });
+    }
+
+    function updateSyncIndicator(isOnline, label) {
+      const lDot = document.getElementById('loginSyncDot');
+      const lLbl = document.getElementById('loginSyncLabel');
+      const hDot = document.getElementById('hdrSyncDot');
+      const hLbl = document.getElementById('hdrSyncText');
+      if (lDot) lDot.className = `inline-block w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-400'}`;
+      if (lLbl) lLbl.textContent = label;
+      if (hDot) hDot.className = `inline-block w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-400'}`;
+      if (hLbl) hLbl.textContent = label;
+    }
+
+    function handleIncomingMessageAlert(msg) {
+      if (!currentUser || msg.senderId === currentUser.id) return;
+      const sender = getProfile(msg.senderId);
+      const senderName = sender ? sender.name : 'Family';
+      if (activeTab !== 'chat') {
+        unreadChatCount++;
+        updateUnreadBadge();
+      }
+      playSoundEffect('chime');
+      showToast(`💬 ${senderName}: ${msg.text}`);
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try { new Notification(`Family HQ · ${senderName}`, { body: msg.text, tag: 'family-hq-chat' }); } catch (e) {}
+      }
+    }
+
+    function updateUnreadBadge() {
+      const dot = document.getElementById('navUnreadDot');
+      if (dot) dot.classList.toggle('hidden', unreadChatCount === 0);
+    }
+
+    async function requestAlertPermission() {
+      playSoundEffect('pop');
+      if (!('Notification' in window)) {
+        showToast("This browser doesn't support web notifications.");
+        updateAlertStatusUI();
+        return;
+      }
+      try {
+        const perm = await Notification.requestPermission();
+        updateAlertStatusUI();
+        if (perm === 'granted') {
+          showToast("🔔 Alerts enabled on this device!");
+          await registerDeviceFcmToken();
+        } else if (perm === 'denied') {
+          showToast("🔕 Alerts blocked in Chrome site settings.");
+        }
+      } catch (err) {
+        updateAlertStatusUI();
+      }
+    }
+
+    async function registerDeviceFcmToken() {
+      if (!messaging || !currentUser || !db) return;
+      try {
+        const token = await messaging.getToken({ vapidKey: VAPID_PUBLIC_KEY });
+        if (token) {
+          localStorage.setItem('family_hq_fcm_token', token);
+          await db.ref(`${TOKENS_DB_PATH}/${currentUser.id}`).set({
+            token,
+            profileName: currentUser.name,
+            updatedAt: Date.now()
+          });
+          updateAlertStatusUI();
+        }
+      } catch (err) {}
+    }
+
+    function updateAlertStatusUI() {
+      const btn = document.getElementById('hdrAlertBtn');
+      const modalState = document.getElementById('modalAlertState');
+      const modalToken = document.getElementById('modalTokenState');
+      const perm = ('Notification' in window) ? Notification.permission : 'unsupported';
+
+      if (btn) {
+        if (perm === 'granted') {
+          btn.textContent = '🔔 On';
+          btn.className = 'tap px-2 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-extrabold';
+        } else if (perm === 'denied') {
+          btn.textContent = '🔕 Off';
+          btn.className = 'tap px-2 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-extrabold';
+        } else {
+          btn.textContent = '🔔 Alerts';
+          btn.className = 'tap px-2 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-extrabold';
+        }
+      }
+      if (modalState) modalState.textContent = perm === 'granted' ? 'Enabled (Granted)' : perm === 'denied' ? 'Blocked by Browser' : 'Not Enabled Yet';
+      if (modalToken) {
+        const savedTok = localStorage.getItem('family_hq_fcm_token');
+        modalToken.textContent = savedTok ? `Device Token: ${savedTok.slice(0, 22)}...` : 'Foreground alerts active · Service worker pending for lock-screen push';
+      }
+    }
+
+    // 6. SEASONAL OVERLAY (DROPDOWN + SEPARATE CHRISTMAS & WINTER) & SPOTLIGHTS
+    function resolveEffectiveSeason(override = state.seasonOverride || 'auto') {
+      if (override !== 'auto') return override;
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const day = now.getDate();
+
+      // Nov 25 – Dec 26: Christmas
+      if ((month === 11 && day >= 25) || (month === 12 && day <= 26)) return 'christmas';
+      // Dec 27 – Feb 28/29: Winter
+      if ((month === 12 && day >= 27) || month === 1 || month === 2) return 'winter';
+      // Mar – May: Spring
+      if (month >= 3 && month <= 5) return 'spring';
+      // Jun – Aug: Summer
+      if (month >= 6 && month <= 8) return 'summer';
+      // Sep 1 – Nov 24: Autumn
+      return 'autumn';
+    }
+
+    function applySeasonalAmbient() {
+      const override = state.seasonOverride || 'auto';
+      const effective = resolveEffectiveSeason(override);
+      const cfg = SEASON_CONFIGS[effective] || SEASON_CONFIGS.autumn;
+
+      const loginBadge = document.getElementById('loginSeasonBadge');
+      const hdrSelect = document.getElementById('hdrSeasonSelect');
+      const modalSelect = document.getElementById('modalSeasonSelect');
+      const badgeLabel = override === 'auto' ? `${cfg.shortIcon} Auto` : cfg.label;
+
+      if (loginBadge) {
+        loginBadge.textContent = badgeLabel;
+        loginBadge.className = effective === 'christmas'
+          ? 'px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 border border-rose-200 text-xs font-extrabold'
+          : effective === 'winter'
+            ? 'px-2.5 py-1 rounded-full bg-sky-100 text-sky-800 border border-sky-200 text-xs font-extrabold'
+            : 'px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-extrabold';
+      }
+
+      if (hdrSelect) {
+        hdrSelect.value = override;
+        hdrSelect.className = effective === 'christmas'
+          ? 'max-w-[108px] sm:max-w-[132px] px-2 py-1.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-800 text-[11px] sm:text-xs font-extrabold focus:outline-none cursor-pointer'
+          : effective === 'winter'
+            ? 'max-w-[108px] sm:max-w-[132px] px-2 py-1.5 rounded-xl bg-sky-50 border border-sky-300 text-sky-800 text-[11px] sm:text-xs font-extrabold focus:outline-none cursor-pointer'
+            : 'max-w-[108px] sm:max-w-[132px] px-2 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-[11px] sm:text-xs font-extrabold focus:outline-none cursor-pointer';
+        if (currentUser && currentUser.role !== 'parent') {
+          hdrSelect.classList.add('hidden');
+        }
+      }
+
+      if (modalSelect) {
+        modalSelect.value = override;
+      }
+
+      if (lastRenderedSeasonKey === effective) return;
+      lastRenderedSeasonKey = effective;
+
+      const layer = document.getElementById('seasonAmbientLayer');
+      if (!layer) return;
+      if (!cfg.particles || !cfg.particles.length) {
+        layer.innerHTML = '';
+        return;
+      }
+
+      const count = cfg.count || 14;
+      const nodes = [];
+      for (let i = 0; i < count; i++) {
+        const glyph = cfg.particles[i % cfg.particles.length];
+        const leftPct = Math.round(((i + 0.5) / count) * 96) + ((i % 3) - 1);
+        const durationSec = 11 + (i % 6) * 2.4;
+        const delaySec = -((i * 1.9) % durationSec);
+        const sizePx = (effective === 'christmas' ? 16 : 14) + (i % 4) * 3;
+        const swayPx = (i % 2 === 0 ? 1 : -1) * (16 + (i % 4) * 8);
+        nodes.push(`<span class="ambient-particle" style="left:${leftPct}%;font-size:${sizePx}px;opacity:${cfg.opacity};--sway:${swayPx}px;animation-duration:${durationSec}s;animation-delay:${delaySec}s;">${glyph}</span>`);
+      }
+      layer.innerHTML = nodes.join('');
+    }
+
+    function setSeasonOverride(newMode) {
+      if (!SEASON_MODES.includes(newMode)) return;
+      state.seasonOverride = newMode;
+      playSoundEffect('pop');
+      persistState();
+      applySeasonalAmbient();
+      renderGreetingBanner();
+      const eff = resolveEffectiveSeason(newMode);
+      const effCfg = SEASON_CONFIGS[eff] || SEASON_CONFIGS.autumn;
+      showToast(`🎨 Theme: ${newMode === 'auto' ? 'Auto (' + effCfg.label + ')' : effCfg.label}`);
+    }
+
+    function toggleSpotlightPreview() {
+      if (!currentUser || currentUser.role !== 'parent') return;
+      state.previewSpotlights = !state.previewSpotlights;
+      persistState();
+      renderSpotlights();
+      if (!document.getElementById('settingsModal').classList.contains('hidden')) openPinSettings();
+      showToast(state.previewSpotlights ? "✨ Spotlight preview ON" : "✨ Spotlight preview OFF");
+    }
+
+    function getUpcomingBirthdaysList() {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return getAllProfiles().map(p => {
+        const [bm, bd] = p.bday.split('-').map(Number);
+        let next = new Date(today.getFullYear(), bm - 1, bd);
+        if (next < today) next = new Date(today.getFullYear() + 1, bm - 1, bd);
+        const daysAway = Math.round((next - today) / 86400000);
+        const turningAge = next.getFullYear() - p.birthYear;
+        return { ...p, next, daysAway, turningAge };
+      }).sort((a, b) => a.daysAway - b.daysAway);
+    }
+
+    function getChristmasSpotlightData(today, previewOn) {
+      const month = today.getMonth() + 1;
+      const dayOfMonth = today.getDate();
+      // Active 1 month ahead of Christmas Day: Nov 25 – Dec 26
+      const isChristmasWindow = (month === 11 && dayOfMonth >= 25) || (month === 12 && dayOfMonth >= 1 && dayOfMonth <= 26);
+      if (!isChristmasWindow && !previewOn) return null;
+
+      const xmasYear = (month === 12 && dayOfMonth > 26) ? today.getFullYear() + 1 : today.getFullYear();
+      const xmasDate = new Date(xmasYear, 11, 25);
+      const sleeps = Math.round((xmasDate - today) / 86400000);
+
+      if (month === 12 && (dayOfMonth === 25 || dayOfMonth === 26)) {
+        return {
+          headline: '🎄 Merry Christmas from Family HQ!',
+          subline: 'Wishing everyone a magical festive day together',
+          badge: '🎅 Joy!',
+          isPreview: false
+        };
+      }
+      const safeSleeps = Math.max(1, sleeps);
+      return {
+        headline: `🎅 Christmas Countdown: ${safeSleeps} ${safeSleeps === 1 ? 'sleep' : 'sleeps'} to go!`,
+        subline: '25 December · Check Plans & Chores for festive fun',
+        badge: `🎄 ${safeSleeps}d`,
+        isPreview: !isChristmasWindow && previewOn
+      };
+    }
+
+    function renderSpotlights() {
+      const box = document.getElementById('spotlightBanners');
+      if (!box || !currentUser) return;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const previewOn = state.previewSpotlights === true;
+      const cards = [];
+
+      const upcoming = getUpcomingBirthdaysList();
+      let bdayMatches = upcoming.filter(b => b.daysAway >= 0 && b.daysAway <= 7);
+      if (!bdayMatches.length && previewOn && upcoming.length) bdayMatches = [upcoming[0]];
+
+      bdayMatches.forEach(b => {
+        const whenText = b.daysAway === 0 ? 'TODAY! 🎉' : b.daysAway === 1 ? 'Tomorrow!' : `In ${b.daysAway} days`;
+        const datePretty = b.next.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+        cards.push(`
+          <div onclick="switchTab('birthdays')" class="tap rounded-3xl p-3.5 border shadow-2xs flex items-center justify-between gap-3 bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-100/80 border-amber-300/90">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-11 h-11 rounded-2xl text-white text-2xl flex items-center justify-center shrink-0 shadow-xs" style="background:${b.color}">${b.icon}</div>
+              <div class="min-w-0">
+                <p class="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">🎂 Birthday Week Spotlight${previewOn && b.daysAway > 7 ? ' · Preview' : ''}</p>
+                <p class="text-xs sm:text-sm font-extrabold text-slate-900 truncate">${esc(b.name)} turns ${b.turningAge} · ${whenText}</p>
+                <p class="text-[11px] font-semibold text-slate-600">${datePretty}</p>
+              </div>
+            </div>
+            <span class="px-2.5 py-1 rounded-full bg-amber-500 text-white text-xs font-extrabold shrink-0">🎈 ${b.daysAway === 0 ? 'TODAY!' : b.daysAway + 'd'}</span>
+          </div>
+        `);
+      });
+
+      const xmasSpot = getChristmasSpotlightData(today, previewOn);
+      if (xmasSpot) {
+        cards.push(`
+          <div class="rounded-3xl p-3.5 border shadow-2xs flex items-center justify-between gap-3 bg-gradient-to-r from-rose-700 via-red-700 to-emerald-800 text-white border-rose-400/50">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur text-2xl flex items-center justify-center shrink-0">🎅</div>
+              <div class="min-w-0">
+                <p class="text-[10px] font-extrabold uppercase tracking-wider text-amber-200">✨ Christmas Spotlight${xmasSpot.isPreview ? ' · Preview' : ''}</p>
+                <p class="text-xs sm:text-sm font-extrabold text-white leading-snug">${xmasSpot.headline}</p>
+                <p class="text-[11px] font-medium text-white/85 truncate">${xmasSpot.subline}</p>
+              </div>
+            </div>
+            <span class="px-2.5 py-1 rounded-full bg-white text-rose-800 text-xs font-extrabold shrink-0 shadow-2xs">${xmasSpot.badge}</span>
+          </div>
+        `);
+      }
+
+      if (!cards.length) {
+        box.innerHTML = '';
+        box.classList.add('hidden');
+        return;
+      }
+      box.innerHTML = cards.join('');
+      box.classList.remove('hidden');
+    }
+
+    // 7. LOGIN, PIN ENTRY, KID ICON & COLOUR PICKER, & PARENT PIN MANAGER
+    function renderLogin() {
+      const grid = document.getElementById('profileGrid');
+      if (!grid) return;
+      grid.innerHTML = getAllProfiles().map(p => {
+        const isCurrent = currentUser && currentUser.id === p.id;
+        return `
+          <button type="button" onclick="selectProfileForPin('${p.id}')" class="tap flex flex-col items-center p-4 rounded-3xl border ${isCurrent ? 'border-slate-900 bg-white ring-2 ring-slate-900/10' : 'border-slate-200/90 bg-slate-50/80 hover:bg-white'} shadow-2xs">
+            <div class="w-14 h-14 rounded-2xl text-white text-3xl flex items-center justify-center shadow-sm mb-2" style="background:${p.color}">${p.icon}</div>
+            <span class="font-extrabold text-sm text-slate-900">${esc(p.name)}</span>
+            <span class="text-[10px] font-bold uppercase tracking-wider mt-0.5 px-2 py-0.5 rounded-full" style="background:${p.soft};color:${p.color}">${isCurrent ? 'Active' : p.role}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function openLoginModal() {
+      const cancelBtn = document.getElementById('cancelSwitchBtn');
+      if (cancelBtn) cancelBtn.classList.toggle('hidden', !currentUser);
+      document.getElementById('mainApp').classList.add('hidden');
+      document.getElementById('loginScreen').classList.remove('hidden');
+      renderLogin();
+    }
+
+    function cancelProfileSwitch() {
+      if (!currentUser) return;
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('mainApp').classList.remove('hidden');
+      renderAll();
+    }
+
+    function selectProfileForPin(profileId) {
+      const prof = getProfile(profileId);
+      if (!prof) return;
+      pendingPinProfile = prof;
+      enteredPin = '';
+      document.getElementById('pinAvatar').style.background = prof.color;
+      document.getElementById('pinAvatar').textContent = prof.icon;
+      document.getElementById('pinTitle').textContent = `Hi ${prof.name}`;
+      document.getElementById('pinError').textContent = '';
+      updatePinDots();
+      const modal = document.getElementById('pinModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closePinModal() {
+      pendingPinProfile = null;
+      enteredPin = '';
+      const modal = document.getElementById('pinModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function updatePinDots() {
+      const dots = document.getElementById('pinDots').children;
+      for (let i = 0; i < 4; i++) {
+        dots[i].className = i < enteredPin.length
+          ? 'w-3.5 h-3.5 rounded-full bg-slate-900 scale-110 transition-transform'
+          : 'w-3.5 h-3.5 rounded-full bg-slate-200';
+      }
+    }
+
+    function pressPinDigit(digit) {
+      if (!pendingPinProfile || enteredPin.length >= 4) return;
+      enteredPin += digit;
+      playSoundEffect('pop');
+      updatePinDots();
+      if (enteredPin.length === 4) {
+        const expected = (state.pins && state.pins[pendingPinProfile.id]) || '1234';
+        if (enteredPin === expected) {
+          const prof = getProfile(pendingPinProfile.id);
+          closePinModal();
+          loginAsProfile(prof);
+        } else {
+          document.getElementById('pinError').textContent = 'Incorrect PIN—try again';
+          enteredPin = '';
+          setTimeout(updatePinDots, 180);
+        }
+      }
+    }
+
+    function backspacePin() {
+      if (enteredPin.length > 0) {
+        enteredPin = enteredPin.slice(0, -1);
+        updatePinDots();
+      }
+    }
+
+    function clearPinInput() {
+      enteredPin = '';
+      document.getElementById('pinError').textContent = '';
+      updatePinDots();
+    }
+
+    function applyActiveUserHeaderAndTheme(prof) {
+      document.documentElement.style.setProperty('--accent', prof.color);
+      document.documentElement.style.setProperty('--accent-soft', prof.soft);
+      document.body.className = prof.role === 'parent' ? 'parent-mode' : 'kid-mode';
+
+      document.getElementById('hdrAvatar').style.background = prof.color;
+      document.getElementById('hdrAvatar').textContent = prof.icon;
+      document.getElementById('hdrName').textContent = prof.name;
+      document.getElementById('hdrRoleBadge').textContent = prof.role;
+
+      const settingsBtn = document.getElementById('hdrSettingsBtn');
+      if (settingsBtn) {
+        settingsBtn.textContent = prof.role === 'kid' ? '🎨 Profile' : '🔑 PIN';
+      }
+    }
+
+    function populateDynamicProfileSelects() {
+      const allProfs = getAllProfiles();
+      const kids = getKidsList();
+
+      const eventWhoSel = document.getElementById('eventWhoSelect');
+      if (eventWhoSel) {
+        const prevVal = eventWhoSel.value || 'everyone';
+        eventWhoSel.innerHTML = `<option value="everyone">🏡 Everyone</option>` +
+          allProfs.map(p => `<option value="${p.id}">${p.icon} ${esc(p.name)}</option>`).join('');
+        eventWhoSel.value = prevVal;
+      }
+
+      const choreKidSel = document.getElementById('choreKidSelect');
+      if (choreKidSel) {
+        const prevKid = choreKidSel.value || (kids[0] ? kids[0].id : 'gracie');
+        choreKidSel.innerHTML = kids.map(k => `<option value="${k.id}">${k.icon} ${esc(k.name)}</option>`).join('');
+        choreKidSel.value = prevKid;
+      }
+    }
+
+    function loginAsProfile(prof) {
+      currentUser = getProfile(prof.id);
+      localStorage.setItem('family_hq_last_user', currentUser.id);
+
+      applyActiveUserHeaderAndTheme(currentUser);
+      updateMuteButtonUI();
+
+      const isParent = currentUser.role === 'parent';
+      const hdrSeasonSelect = document.getElementById('hdrSeasonSelect');
+      if (hdrSeasonSelect) {
+        hdrSeasonSelect.classList.toggle('hidden', !isParent);
+        hdrSeasonSelect.value = state.seasonOverride || 'auto';
+      }
+      document.getElementById('addEventForm').classList.toggle('hidden', !isParent);
+      document.getElementById('clearEventsBtn').classList.toggle('hidden', !isParent);
+      document.getElementById('addChoreForm').classList.toggle('hidden', !isParent);
+      document.getElementById('parentChoreActions').classList.toggle('hidden', !isParent);
+
+      selectedChoreKidFilter = isParent ? 'all' : currentUser.id;
+
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('mainApp').classList.remove('hidden');
+
+      if (state.messages.length) lastKnownMessageId = state.messages[state.messages.length - 1].id;
+
+      updateAlertStatusUI();
+      if ('Notification' in window && Notification.permission === 'granted') registerDeviceFcmToken();
+
+      switchTab(activeTab || 'chat');
+      renderAll();
+    }
+
+    function openPinSettings() {
+      if (!currentUser) return;
+      document.getElementById('newPinInput').value = '';
+      updateAlertStatusUI();
+
+      const isParent = currentUser.role === 'parent';
+      const kidBox = document.getElementById('kidCustomizerBox');
+      const seasonBox = document.getElementById('seasonControlBox');
+      const pinMgrBox = document.getElementById('adminPinManagerBox');
+      const modalTitle = document.getElementById('settingsModalTitle');
+
+      if (!isParent) {
+        modalTitle.textContent = `🎨 ${currentUser.name}'s Profile & PIN`;
+        kidBox.classList.remove('hidden');
+        seasonBox.classList.add('hidden');
+        pinMgrBox.classList.add('hidden');
+
+        const latestSelf = getProfile(currentUser.id);
+        draftKidIcon = latestSelf.icon;
+        draftKidAccent = latestSelf.color;
+        draftKidSoft = latestSelf.soft;
+        renderKidCustomizerUI();
+      } else {
+        modalTitle.textContent = '🔑 PIN & HQ Settings';
+        kidBox.classList.add('hidden');
+        seasonBox.classList.remove('hidden');
+        pinMgrBox.classList.remove('hidden');
+
+        const modalSeasonSel = document.getElementById('modalSeasonSelect');
+        if (modalSeasonSel) {
+          modalSeasonSel.value = state.seasonOverride || 'auto';
+        }
+
+        const prevBtn = document.getElementById('previewSpotlightsBtn');
+        const isOn = state.previewSpotlights === true;
+        prevBtn.textContent = isOn ? 'On' : 'Off';
+        prevBtn.className = isOn
+          ? 'tap px-3.5 py-1.5 rounded-xl border text-xs font-extrabold bg-accent text-white border-accent'
+          : 'tap px-3.5 py-1.5 rounded-xl border text-xs font-extrabold bg-white text-slate-700 border-slate-300';
+
+        renderFamilyPinManager();
+      }
+
+      const modal = document.getElementById('settingsModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function renderKidCustomizerUI() {
+      const previewAvatar = document.getElementById('kidPreviewAvatar');
+      const previewLabel = document.getElementById('kidPreviewColourLabel');
+      const swatchesEl = document.getElementById('kidColourSwatches');
+      const iconGridEl = document.getElementById('kidIconGrid');
+
+      if (previewAvatar) {
+        previewAvatar.style.background = draftKidAccent;
+        previewAvatar.textContent = draftKidIcon;
+      }
+      const matchedSwatch = KID_COLOUR_SWATCHES.find(s => s.accent.toLowerCase() === draftKidAccent.toLowerCase());
+      if (previewLabel) {
+        previewLabel.textContent = `${draftKidIcon} · ${matchedSwatch ? matchedSwatch.name : 'Custom'} Theme`;
+      }
+
+      if (swatchesEl) {
+        swatchesEl.innerHTML = KID_COLOUR_SWATCHES.map(sw => {
+          const isSelected = sw.accent.toLowerCase() === draftKidAccent.toLowerCase();
+          return `
+            <button type="button" onclick="selectDraftKidColour('${sw.accent}', '${sw.soft}')" title="${sw.name}" aria-label="${sw.name}" class="tap w-8 h-8 rounded-full mx-auto flex items-center justify-center text-white text-xs font-extrabold transition-transform ${isSelected ? 'scale-110 ring-2 ring-offset-2 ring-slate-900' : 'opacity-90 hover:opacity-100'}" style="background:${sw.accent}">
+              ${isSelected ? '✓' : ''}
+            </button>
+          `;
+        }).join('');
+      }
+
+      if (iconGridEl) {
+        iconGridEl.innerHTML = KID_ICON_CHOICES.map(ic => {
+          const isSelected = ic === draftKidIcon;
+          return `
+            <button type="button" onclick="selectDraftKidIcon('${ic}')" class="tap h-9 rounded-xl text-xl flex items-center justify-center border ${isSelected ? 'border-slate-900 ring-2 ring-slate-900/15 scale-105 font-bold' : 'border-transparent hover:bg-slate-100'}" style="${isSelected ? `background:${draftKidSoft}` : ''}">
+              ${ic}
+            </button>
+          `;
+        }).join('');
+      }
+    }
+
+    function selectDraftKidIcon(icon) {
+      draftKidIcon = icon;
+      playSoundEffect('pop');
+      document.getElementById('hdrAvatar').textContent = icon;
+      renderKidCustomizerUI();
+    }
+
+    function selectDraftKidColour(accent, soft) {
+      draftKidAccent = accent;
+      draftKidSoft = soft;
+      playSoundEffect('pop');
+      document.documentElement.style.setProperty('--accent', accent);
+      document.documentElement.style.setProperty('--accent-soft', soft);
+      document.getElementById('hdrAvatar').style.background = accent;
+      renderKidCustomizerUI();
+    }
+
+    function saveKidCustomization() {
+      if (!currentUser || currentUser.role !== 'kid') return;
+      if (!state.profileCustomizations) state.profileCustomizations = {};
+      state.profileCustomizations[currentUser.id] = {
+        icon: draftKidIcon,
+        accent: draftKidAccent,
+        soft: draftKidSoft
+      };
+      currentUser = getProfile(currentUser.id);
+      applyActiveUserHeaderAndTheme(currentUser);
+      playSoundEffect('chime');
+      persistState();
+      renderAll();
+      closeSettingsModal();
+      showToast(`${draftKidIcon} Saved your new icon & theme colour!`);
+    }
+
+    function renderFamilyPinManager() {
+      const listEl = document.getElementById('familyPinManagerList');
+      if (!listEl) return;
+      listEl.innerHTML = getAllProfiles().map(p => {
+        const curPin = (state.pins && state.pins[p.id]) || '1234';
+        const isDefault = curPin === '1234';
+        return `
+          <div class="flex items-center justify-between gap-2 bg-white px-3 py-2 rounded-2xl border border-slate-200/80">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="w-7 h-7 rounded-xl text-white text-sm flex items-center justify-center shrink-0" style="background:${p.color}">${p.icon}</span>
+              <span class="text-xs font-extrabold text-slate-800 truncate">${esc(p.name)}</span>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-800 font-mono text-xs font-extrabold tracking-widest">${esc(curPin)}</span>
+              <button type="button" onclick="resetProfilePinToDefault('${p.id}')" class="tap px-2.5 py-1 rounded-xl text-[11px] font-extrabold ${isDefault ? 'bg-slate-100 text-slate-400' : 'bg-slate-800 text-white'}">
+                Reset to 1234
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function resetProfilePinToDefault(profileId) {
+      if (!currentUser || currentUser.role !== 'parent') return;
+      state.pins[profileId] = '1234';
+      persistState();
+      renderFamilyPinManager();
+      const prof = getProfile(profileId);
+      showToast(`✅ ${prof ? prof.name : 'Profile'}'s PIN reset to 1234`);
+    }
+
+    function closeSettingsModal() {
+      if (currentUser) {
+        currentUser = getProfile(currentUser.id);
+        applyActiveUserHeaderAndTheme(currentUser);
+      }
+      const modal = document.getElementById('settingsModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function saveOwnPin() {
+      const val = document.getElementById('newPinInput').value.trim();
+      if (!/^\d{4}$/.test(val)) {
+        showToast("Enter exactly 4 numbers for your PIN");
+        return;
+      }
+      state.pins[currentUser.id] = val;
+      persistState();
+      closeSettingsModal();
+      showToast("✅ Your PIN has been updated");
+    }
+
+    // 8. GREETING BANNER & NAVIGATION
+    function getTimeOfDayGreeting() {
+      const hr = new Date().getHours();
+      if (hr < 12) return 'Good morning';
+      if (hr < 18) return 'Good afternoon';
+      return 'Good evening';
+    }
+
+    function renderGreetingBanner() {
+      const box = document.getElementById('greetingBanner');
+      if (!box || !currentUser) return;
+      // Intentionally omitted for Mikey
+      if (currentUser.id === 'mikey' || !PROFILE_GREETINGS[currentUser.id]) {
+        box.innerHTML = '';
+        box.classList.add('hidden');
+        return;
+      }
+      box.classList.remove('hidden');
+      const tod = getTimeOfDayGreeting();
+      const personalLine = PROFILE_GREETINGS[currentUser.id];
+      const soundBtn = currentUser.role === 'kid'
+        ? `<button type="button" onclick="playSoundEffect('${currentUser.id === 'teddy' ? 'roar' : 'fanfare'}')" title="Play fun sound!" class="tap px-2.5 py-1 rounded-full bg-white/90 text-xs font-extrabold shadow-2xs shrink-0">${currentUser.id === 'teddy' ? '🦖 Roar!' : '🎵 Chime'}</button>`
+        : '';
+
+      box.innerHTML = `
+        <div class="rounded-3xl p-3.5 sm:p-4 border shadow-2xs flex items-center justify-between gap-3" style="background:${currentUser.soft}; border-color:${currentUser.color}33;">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-11 h-11 rounded-2xl text-white text-2xl flex items-center justify-center shrink-0 shadow-2xs" style="background:${currentUser.color}">${currentUser.icon}</div>
+            <div class="min-w-0">
+              <p class="text-[11px] font-extrabold uppercase tracking-wider" style="color:${currentUser.color}">${tod}, ${esc(currentUser.name)}</p>
+              <p class="text-xs sm:text-sm font-extrabold text-slate-800 leading-snug mt-0.5">${esc(personalLine)}</p>
+            </div>
+          </div>
+          ${soundBtn}
+        </div>
+      `;
+    }
+
+    function switchTab(tabName) {
+      activeTab = tabName;
+      ['chat', 'schedule', 'chores', 'shop', 'requests', 'birthdays'].forEach(t => {
+        const el = document.getElementById(`tab-${t}`);
+        if (el) el.classList.toggle('hidden', t !== tabName);
+      });
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        const isCur = btn.getAttribute('data-tab') === tabName;
+        btn.className = isCur
+          ? 'nav-btn tap flex flex-col items-center justify-center py-1.5 rounded-2xl bg-accent-soft text-accent relative'
+          : 'nav-btn tap flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-500 relative';
+      });
+      if (tabName === 'chat') {
+        unreadChatCount = 0;
+        updateUnreadBadge();
+      }
+      renderAll();
+    }
+
+    // 9. TAB 1: WOULD YOU RATHER (45 PROMPTS) + FAMILY WALL + REACTIONS
+    function renderWouldYouRather() {
+      const card = document.getElementById('wouldYouRatherCard');
+      if (!card) return;
+      const idx = ((state.wyrIndex || 0) % WOULD_YOU_RATHER_PROMPTS.length + WOULD_YOU_RATHER_PROMPTS.length) % WOULD_YOU_RATHER_PROMPTS.length;
+      const prompt = WOULD_YOU_RATHER_PROMPTS[idx];
+      const votesForIdx = (state.wyrVotes && state.wyrVotes[idx]) || {};
+
+      const votersA = [];
+      const votersB = [];
+      Object.keys(votesForIdx).forEach(uid => {
+        const prof = getProfile(uid);
+        if (!prof) return;
+        if (votesForIdx[uid] === 'A') votersA.push(prof);
+        else if (votesForIdx[uid] === 'B') votersB.push(prof);
+      });
+
+      const totalVotes = votersA.length + votersB.length;
+      const pctA = totalVotes ? Math.round((votersA.length / totalVotes) * 100) : 50;
+      const pctB = totalVotes ? 100 - pctA : 50;
+      const myVote = currentUser ? votesForIdx[currentUser.id] : null;
+
+      card.innerHTML = `
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5">
+            <span class="px-2.5 py-0.5 rounded-full bg-white/20 text-[10px] font-extrabold uppercase tracking-wider">🤔 Would You Rather?</span>
+            <span class="text-[11px] font-bold text-white/80">#${idx + 1} of ${WOULD_YOU_RATHER_PROMPTS.length}</span>
+          </div>
+          <button type="button" onclick="nextWouldYouRather()" class="tap px-2.5 py-1 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-extrabold">🎲 New Question</button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button type="button" onclick="voteWouldYouRather('A')" class="tap text-left p-3 rounded-2xl border transition-all ${myVote === 'A' ? 'bg-white text-slate-900 border-white shadow-sm ring-2 ring-amber-300' : 'bg-white/15 hover:bg-white/25 text-white border-white/25'}">
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <span class="text-[10px] font-extrabold uppercase tracking-wider ${myVote === 'A' ? 'text-indigo-700' : 'text-amber-200'}">Option A ${myVote === 'A' ? '· Your Pick ✓' : ''}</span>
+              <span class="text-xs font-extrabold">${votersA.length} ${totalVotes ? `(${pctA}%)` : ''}</span>
+            </div>
+            <p class="text-xs sm:text-sm font-extrabold leading-snug">${esc(prompt.a)}</p>
+            ${votersA.length ? `<div class="flex flex-wrap gap-1 mt-2">${votersA.map(v => `<span class="text-sm" title="${esc(v.name)}">${v.icon}</span>`).join('')}</div>` : ''}
+          </button>
+
+          <button type="button" onclick="voteWouldYouRather('B')" class="tap text-left p-3 rounded-2xl border transition-all ${myVote === 'B' ? 'bg-white text-slate-900 border-white shadow-sm ring-2 ring-amber-300' : 'bg-white/15 hover:bg-white/25 text-white border-white/25'}">
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <span class="text-[10px] font-extrabold uppercase tracking-wider ${myVote === 'B' ? 'text-purple-700' : 'text-amber-200'}">Option B ${myVote === 'B' ? '· Your Pick ✓' : ''}</span>
+              <span class="text-xs font-extrabold">${votersB.length} ${totalVotes ? `(${pctB}%)` : ''}</span>
+            </div>
+            <p class="text-xs sm:text-sm font-extrabold leading-snug">${esc(prompt.b)}</p>
+            ${votersB.length ? `<div class="flex flex-wrap gap-1 mt-2">${votersB.map(v => `<span class="text-sm" title="${esc(v.name)}">${v.icon}</span>`).join('')}</div>` : ''}
+          </button>
+        </div>
+
+        ${totalVotes > 0 ? `
+          <div class="w-full h-2 rounded-full bg-white/20 overflow-hidden flex">
+            <div class="h-full bg-amber-300 transition-all duration-300" style="width:${pctA}%"></div>
+            <div class="h-full bg-sky-300 transition-all duration-300" style="width:${pctB}%"></div>
+          </div>
+        ` : `<p class="text-[11px] font-semibold text-white/80 text-center">Tap Option A or Option B to cast your family vote!</p>`}
+      `;
+    }
+
+    function voteWouldYouRather(choice) {
+      if (!currentUser) return;
+      const idx = ((state.wyrIndex || 0) % WOULD_YOU_RATHER_PROMPTS.length + WOULD_YOU_RATHER_PROMPTS.length) % WOULD_YOU_RATHER_PROMPTS.length;
+      if (!state.wyrVotes) state.wyrVotes = {};
+      if (!state.wyrVotes[idx]) state.wyrVotes[idx] = {};
+      state.wyrVotes[idx][currentUser.id] = choice;
+      playSoundEffect('pop');
+      persistState();
+      renderWouldYouRather();
+    }
+
+    function nextWouldYouRather() {
+      const cur = state.wyrIndex || 0;
+      state.wyrIndex = (cur + 1) % WOULD_YOU_RATHER_PROMPTS.length;
+      playSoundEffect('pop');
+      persistState();
+      renderWouldYouRather();
+    }
+
+    function toggleChatReaction(msgId, emoji) {
+      if (!currentUser) return;
+      const msg = state.messages.find(m => m.id === msgId);
+      if (!msg) return;
+      if (!msg.reactions || typeof msg.reactions !== 'object') msg.reactions = {};
+      if (!Array.isArray(msg.reactions[emoji])) msg.reactions[emoji] = [];
+
+      const existingIdx = msg.reactions[emoji].indexOf(currentUser.id);
+      if (existingIdx >= 0) {
+        msg.reactions[emoji].splice(existingIdx, 1);
+        if (!msg.reactions[emoji].length) delete msg.reactions[emoji];
+      } else {
+        msg.reactions[emoji].push(currentUser.id);
+        playSoundEffect(emoji === '🦖' ? 'roar' : 'pop');
+      }
+      persistState();
+      renderChat();
+    }
+
+    function renderChat() {
+      renderWouldYouRather();
+      const feed = document.getElementById('chatFeed');
+      const badge = document.getElementById('chatCountBadge');
+      if (!feed) return;
+      badge.textContent = `${state.messages.length} ${state.messages.length === 1 ? 'message' : 'messages'}`;
+
+      if (!state.messages.length) {
+        feed.innerHTML = `<div class="bg-white rounded-3xl p-8 text-center border border-slate-200/80 text-xs font-semibold text-slate-400">No messages on the wall yet. Say hello to everyone!</div>`;
+        return;
+      }
+
+      const isParent = currentUser && currentUser.role === 'parent';
+      feed.innerHTML = state.messages.map(m => {
+        const sender = getProfile(m.senderId) || { name: 'Family', icon: '💬', color: '#475569' };
+        const isMine = currentUser && m.senderId === currentUser.id;
+        const timeStr = new Date(m.ts || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const reactionsObj = (m.reactions && typeof m.reactions === 'object') ? m.reactions : {};
+
+        const reactionPillsHtml = CHAT_REACTIONS.map(em => {
+          const users = Array.isArray(reactionsObj[em]) ? reactionsObj[em] : [];
+          const reactedByMe = currentUser && users.includes(currentUser.id);
+          return `
+            <button type="button" onclick="toggleChatReaction('${m.id}', '${em}')" class="tap px-2 py-0.5 rounded-full text-[11px] font-extrabold border flex items-center gap-1 ${reactedByMe ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-2xs' : 'bg-white/95 border-slate-200 text-slate-600 hover:bg-slate-50'}">
+              <span>${em}</span>
+              ${users.length > 0 ? `<span>${users.length}</span>` : ''}
+            </button>
+          `;
+        }).join('');
+
+        return `
+          <div class="flex items-start gap-2.5 ${isMine ? 'flex-row-reverse' : ''}">
+            <div class="w-9 h-9 rounded-2xl text-white text-base flex items-center justify-center shrink-0 shadow-2xs" style="background:${sender.color}">${sender.icon}</div>
+            <div class="max-w-[82%] space-y-1">
+              <div class="rounded-3xl px-4 py-2.5 border shadow-2xs ${isMine ? 'bg-accent text-white border-transparent' : 'bg-white text-slate-800 border-slate-200/80'}">
+                <div class="flex items-center justify-between gap-3 mb-0.5">
+                  <span class="text-[11px] font-extrabold ${isMine ? 'text-white/90' : ''}" style="${!isMine ? `color:${sender.color}` : ''}">${esc(sender.name)}</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] ${isMine ? 'text-white/75' : 'text-slate-400'}">${timeStr}</span>
+                    ${isParent ? `<button type="button" onclick="deleteChatMessage('${m.id}')" class="text-[10px] opacity-70 hover:opacity-100">✕</button>` : ''}
+                  </div>
+                </div>
+                <p class="text-xs sm:text-sm font-medium leading-relaxed break-words">${esc(m.text)}</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-1 ${isMine ? 'justify-end' : 'justify-start'}">
+                ${reactionPillsHtml}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      feed.scrollTop = feed.scrollHeight;
+    }
+
+    function sendChatMessage(e) {
+      e.preventDefault();
+      if (!currentUser) return;
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const msg = {
+        id: 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        senderId: currentUser.id,
+        text,
+        reactions: {},
+        ts: Date.now()
+      };
+      state.messages.push(msg);
+      if (state.messages.length > 80) state.messages = state.messages.slice(-80);
+      lastKnownMessageId = msg.id;
+      input.value = '';
+      playSoundEffect('pop');
+      persistState();
+      renderChat();
+    }
+
+    function deleteChatMessage(msgId) {
+      state.messages = state.messages.filter(m => m.id !== msgId);
+      persistState();
+      renderChat();
+    }
+
+    // 10. SPECIFIC DAYS PILL PICKERS
+    function renderSpecificDayPills(target) {
+      const container = document.getElementById(target === 'event' ? 'eventDayPills' : 'choreDayPills');
+      const chosen = target === 'event' ? selectedEventSpecificDays : selectedChoreSpecificDays;
+      if (!container) return;
+      container.innerHTML = FRI_THU_DAYS.map(d => {
+        const active = chosen.includes(d.dow);
+        return `<button type="button" onclick="toggleSpecificDay('${target}', ${d.dow})" class="tap py-2 rounded-xl border text-xs font-extrabold ${active ? 'bg-accent text-white border-accent shadow-2xs' : 'bg-white text-slate-600 border-slate-200'}">${d.short}</button>`;
+      }).join('');
+    }
+
+    function toggleSpecificDaysPicker(target) {
+      const sel = document.getElementById(target === 'event' ? 'eventRepeatSelect' : 'choreRepeatSelect');
+      const wrap = document.getElementById(target === 'event' ? 'eventSpecificDaysWrap' : 'choreSpecificDaysWrap');
+      if (!sel || !wrap) return;
+      const isSpec = sel.value === 'specific';
+      wrap.classList.toggle('hidden', !isSpec);
+      if (isSpec) renderSpecificDayPills(target);
+    }
+
+    function toggleSpecificDay(target, dow) {
+      let arr = target === 'event' ? selectedEventSpecificDays : selectedChoreSpecificDays;
+      if (arr.includes(dow)) {
+        if (arr.length > 1) arr = arr.filter(x => x !== dow);
+      } else {
+        arr = [...arr, dow];
+      }
+      if (target === 'event') selectedEventSpecificDays = arr;
+      else selectedChoreSpecificDays = arr;
+      renderSpecificDayPills(target);
+    }
+
+    // 11. TAB 2: PLANS (SCHEDULE)
+    function onScheduleDateChange(val) {
+      if (!val) return;
+      selectedScheduleDate = val;
+      renderSchedule();
+    }
+
+    function selectScheduleDate(iso) {
+      selectedScheduleDate = iso;
+      renderSchedule();
+    }
+
+    function doesEventMatchDate(ev, targetISO) {
+      const target = new Date(targetISO + 'T00:00:00');
+      const startISO = ev.date || targetISO;
+      const start = new Date(startISO + 'T00:00:00');
+      if (target < start) return false;
+
+      const rep = ev.repeat || 'once';
+      if (rep === 'once') return targetISO === startISO;
+      if (rep === 'daily') return true;
+      if (rep === 'weekdays') return target.getDay() >= 1 && target.getDay() <= 5;
+      if (rep === 'weekly') return target.getDay() === start.getDay();
+      if (rep === 'fortnightly') return Math.round((target - start) / 86400000) % 14 === 0;
+      if (rep === 'monthly') return target.getDate() === start.getDate();
+      if (rep === 'specific') return Array.isArray(ev.specificDays) && ev.specificDays.includes(target.getDay());
+      return false;
+    }
+
+    function renderSchedule() {
+      const picker = document.getElementById('scheduleDatePicker');
+      if (picker) picker.value = selectedScheduleDate;
+
+      const selObj = new Date(selectedScheduleDate + 'T00:00:00');
+      const labelEl = document.getElementById('scheduleSelectedLabel');
+      if (labelEl) labelEl.textContent = selObj.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+
+      const strip = document.getElementById('scheduleWeekStrip');
+      const weekStart = new Date(getCycleStartISO(selObj) + 'T00:00:00');
+      if (strip) {
+        strip.innerHTML = FRI_THU_DAYS.map((d, idx) => {
+          const dt = new Date(weekStart);
+          dt.setDate(weekStart.getDate() + idx);
+          const iso = toISODate(dt);
+          const isSelected = iso === selectedScheduleDate;
+          const isToday = iso === toISODate(new Date());
+          const hasItems = state.events.some(ev => doesEventMatchDate(ev, iso));
+          return `
+            <button type="button" onclick="selectScheduleDate('${iso}')" class="tap flex flex-col items-center py-2 px-1 rounded-2xl border ${isSelected ? 'bg-accent text-white border-accent shadow-xs' : 'bg-white text-slate-700 border-slate-200/80'}">
+              <span class="text-[10px] font-extrabold uppercase ${isSelected ? 'text-white/85' : 'text-slate-400'}">${d.short}</span>
+              <span class="text-sm font-extrabold mt-0.5">${dt.getDate()}</span>
+              <span class="w-1.5 h-1.5 rounded-full mt-1 ${hasItems ? (isSelected ? 'bg-white' : 'bg-accent') : (isToday ? 'bg-amber-400' : 'bg-transparent')}"></span>
+            </button>
+          `;
+        }).join('');
+      }
+
+      const list = document.getElementById('scheduleList');
+      if (!list) return;
+
+      const matching = state.events
+        .filter(ev => doesEventMatchDate(ev, selectedScheduleDate))
+        .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+      if (!matching.length) {
+        list.innerHTML = `<div class="bg-white rounded-3xl p-8 text-center border border-slate-200/80 text-xs font-semibold text-slate-400">Nothing planned for this day.</div>`;
+        return;
+      }
+
+      const isParent = currentUser && currentUser.role === 'parent';
+      list.innerHTML = matching.map(ev => {
+        const who = ev.who === 'everyone'
+          ? { name: 'Everyone', icon: '🏡', color: '#2b5c43', soft: '#e6f0ec' }
+          : (getProfile(ev.who) || { name: 'Family', icon: '📅', color: '#475569', soft: '#f1f5f9' });
+
+        let repBadge = REPEAT_LABELS[ev.repeat] || 'One-off';
+        if (ev.repeat === 'specific' && Array.isArray(ev.specificDays)) {
+          repBadge = FRI_THU_DAYS.filter(d => ev.specificDays.includes(d.dow)).map(d => d.short).join(', ') || 'Specific days';
+        }
+
+        return `
+          <div class="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-11 h-11 rounded-2xl text-white text-xl flex items-center justify-center shrink-0" style="background:${who.color}">${who.icon}</div>
+              <div class="min-w-0">
+                <p class="font-extrabold text-sm text-slate-900 truncate">${esc(ev.title)}</p>
+                <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                  <span class="text-[11px] font-extrabold px-2 py-0.5 rounded-full" style="background:${who.soft};color:${who.color}">${esc(who.name)}</span>
+                  <span class="text-[11px] font-bold text-slate-500">🕒 ${esc(ev.time || 'All day')}</span>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">🔁 ${esc(repBadge)}</span>
+                </div>
+              </div>
+            </div>
+            ${isParent ? `<button type="button" onclick="deleteScheduleEvent('${ev.id}')" class="tap px-2.5 py-1.5 rounded-xl bg-rose-50 text-rose-700 text-xs font-extrabold shrink-0">✕</button>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function addScheduleEvent(e) {
+      e.preventDefault();
+      if (!currentUser || currentUser.role !== 'parent') return;
+      const title = document.getElementById('eventTitleInput').value.trim();
+      const who = document.getElementById('eventWhoSelect').value;
+      const time = document.getElementById('eventTimeInput').value;
+      const repeat = document.getElementById('eventRepeatSelect').value;
+      if (!title) return;
+
+      state.events.push({
+        id: 'ev_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        title,
+        who,
+        time,
+        date: selectedScheduleDate,
+        repeat,
+        specificDays: repeat === 'specific' ? [...selectedEventSpecificDays] : []
+      });
+      document.getElementById('eventTitleInput').value = '';
+      playSoundEffect('pop');
+      persistState();
+      renderSchedule();
+      showToast("📅 Added to family plans");
+    }
+
+    function deleteScheduleEvent(evId) {
+      state.events = state.events.filter(ev => ev.id !== evId);
+      persistState();
+      renderSchedule();
+    }
+
+    function clearAllEvents() {
+      if (!currentUser || currentUser.role !== 'parent') return;
+      state.events = [];
+      persistState();
+      renderSchedule();
+      showToast("🗑️ All plans cleared");
+    }
+
+    // 12. TAB 3: CHORES, GOLDEN CHORES (+2 BONUS STARS) & CELEBRATION CONFETTI
+    function getChoreEffectiveStars(chore) {
+      const base = Number(chore.stars || 1);
+      return chore.golden === true ? base + 2 : base;
+    }
+
+    function calculateKidStars(kidId) {
+      let total = Number((state.bonusStars && state.bonusStars[kidId]) || 0);
+      state.chores.filter(c => c.kidId === kidId).forEach(c => {
+        const starVal = getChoreEffectiveStars(c);
+        const ticks = c.ticks || {};
+        if (c.repeat === 'daily' || c.repeat === 'weekdays' || c.repeat === 'specific') {
+          Object.keys(ticks).forEach(k => { if (ticks[k] === true) total += starVal; });
+        } else if (ticks.done === true) {
+          total += starVal;
+        }
+      });
+      return Math.max(0, total);
+    }
+
+    function checkAndTriggerTenStarCelebration(kidId, previousStars) {
+      const newStars = calculateKidStars(kidId);
+      if (newStars >= 10) {
+        if (!state.celebratedTenStars) state.celebratedTenStars = {};
+        const alreadyCelebrated = state.celebratedTenStars[kidId] === true;
+        if (previousStars < 10 || !alreadyCelebrated) {
+          state.celebratedTenStars[kidId] = true;
+          playSoundEffect('fanfare');
+          launchConfetti();
+          const kid = getProfile(kidId);
+          showToast(`🎉 ${kid ? kid.name : 'Way to go'} hit 10 Stars — Pocket Money Unlocked!`);
+        }
+      }
+    }
+
+    function manualCelebrateKid(kidId) {
+      playSoundEffect('fanfare');
+      launchConfetti();
+      const kid = getProfile(kidId);
+      showToast(`🏆 Celebrating ${kid ? kid.name : '10-Star Club'}!`);
+    }
+
+    function renderChores() {
+      const startDt = new Date(state.cycleStartISO + 'T00:00:00');
+      const endDt = new Date(startDt);
+      endDt.setDate(startDt.getDate() + 6);
+      const fmtOpts = { weekday: 'short', day: 'numeric', month: 'short' };
+      const cycleLbl = document.getElementById('cycleRangeLabel');
+      if (cycleLbl) cycleLbl.textContent = `Fri–Thu Cycle: ${startDt.toLocaleDateString('en-GB', fmtOpts)} – ${endDt.toLocaleDateString('en-GB', fmtOpts)} (resets Thu 23:59)`;
+
+      const isParent = currentUser && currentUser.role === 'parent';
+      if (!isParent && currentUser) {
+        selectedChoreKidFilter = currentUser.id;
+      }
+
+      const kids = getKidsList();
+      const scoreboard = document.getElementById('kidsStarScoreboard');
+      if (scoreboard) {
+        if (!isParent) {
+          scoreboard.classList.add('hidden');
+          scoreboard.innerHTML = '';
+        } else {
+          scoreboard.classList.remove('hidden');
+          scoreboard.innerHTML = kids.map(k => {
+            const stars = calculateKidStars(k.id);
+            return `
+              <button type="button" onclick="setChoreKidFilter('${k.id}')" class="tap rounded-2xl p-2 border text-center ${stars >= 10 ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200/80'}">
+                <div class="text-lg leading-none">${k.icon}</div>
+                <p class="text-[11px] font-extrabold text-slate-800 truncate mt-1">${esc(k.name)}</p>
+                <p class="text-[11px] font-extrabold mt-0.5" style="color:${k.color}">${stars}/10 ⭐</p>
+              </button>
+            `;
+          }).join('');
+        }
+      }
+
+      const filterRow = document.getElementById('choreKidFilterRow');
+      if (filterRow) {
+        if (!isParent) {
+          filterRow.classList.add('hidden');
+          filterRow.innerHTML = '';
+        } else {
+          filterRow.classList.remove('hidden');
+          const allBtn = `<button type="button" onclick="setChoreKidFilter('all')" class="tap px-3.5 py-1.5 rounded-full text-xs font-extrabold shrink-0 ${selectedChoreKidFilter === 'all' ? 'bg-accent text-white' : 'bg-white text-slate-600 border border-slate-200'}">All Kids</button>`;
+          const kidBtns = kids.map(k => `
+            <button type="button" onclick="setChoreKidFilter('${k.id}')" class="tap px-3.5 py-1.5 rounded-full text-xs font-extrabold shrink-0 ${selectedChoreKidFilter === k.id ? 'text-white' : 'bg-white text-slate-700 border border-slate-200'}" style="${selectedChoreKidFilter === k.id ? `background:${k.color}` : ''}">
+              ${k.icon} ${esc(k.name)}
+            </button>
+          `).join('');
+          filterRow.innerHTML = allBtn + kidBtns;
+        }
+      }
+
+      const container = document.getElementById('choresContainer');
+      if (!container) return;
+
+      const visibleKids = !isParent && currentUser
+        ? kids.filter(k => k.id === currentUser.id)
+        : (selectedChoreKidFilter === 'all' ? kids : kids.filter(k => k.id === selectedChoreKidFilter));
+
+      container.innerHTML = visibleKids.map(kid => {
+        const stars = calculateKidStars(kid.id);
+        const pct = Math.min(100, Math.round((stars / 10) * 100));
+        const kidChores = state.chores.filter(c => c.kidId === kid.id);
+        const canTick = isParent || (currentUser && currentUser.id === kid.id);
+
+        const choresHtml = !kidChores.length
+          ? `<p class="text-xs font-semibold text-slate-400 text-center py-3">No chores assigned yet</p>`
+          : kidChores.map(c => {
+              const starVal = getChoreEffectiveStars(c);
+              const isGolden = c.golden === true;
+              let repLabel = REPEAT_LABELS[c.repeat] || 'Daily';
+              let controlHtml = '';
+
+              if (c.repeat === 'daily' || c.repeat === 'weekdays' || c.repeat === 'specific') {
+                const daysToShow = c.repeat === 'daily'
+                  ? FRI_THU_DAYS
+                  : c.repeat === 'weekdays'
+                    ? FRI_THU_DAYS.filter(d => d.dow >= 1 && d.dow <= 5)
+                    : FRI_THU_DAYS.filter(d => Array.isArray(c.specificDays) && c.specificDays.includes(d.dow));
+
+                if (c.repeat === 'specific') repLabel = daysToShow.map(d => d.short).join(', ') || 'Specific days';
+
+                controlHtml = `
+                  <div class="grid grid-cols-7 gap-1 mt-2.5">
+                    ${daysToShow.map(d => {
+                      const checked = !!(c.ticks && c.ticks[`dow_${d.dow}`]);
+                      return `
+                        <button type="button" ${canTick ? `onclick="toggleChoreDayTick('${c.id}', ${d.dow})"` : 'disabled'} class="tap py-1.5 rounded-xl border text-[11px] font-extrabold flex flex-col items-center ${checked ? 'text-white border-transparent shadow-2xs' : 'bg-white/90 text-slate-600 border-slate-200'}" style="${checked ? `background:${isGolden ? '#d97706' : kid.color}` : ''}">
+                          <span>${d.short}</span>
+                          <span class="text-[10px] mt-0.5">${checked ? '✓' : '○'}</span>
+                        </button>
+                      `;
+                    }).join('')}
+                  </div>
+                `;
+              } else {
+                const done = !!(c.ticks && c.ticks.done);
+                controlHtml = `
+                  <div class="mt-2">
+                    <button type="button" ${canTick ? `onclick="toggleSingleChoreTick('${c.id}')"` : 'disabled'} class="tap w-full py-2 px-3 rounded-xl border text-xs font-extrabold flex items-center justify-center gap-2 ${done ? 'text-white border-transparent' : 'bg-white/90 text-slate-700 border-slate-200'}" style="${done ? `background:${isGolden ? '#d97706' : kid.color}` : ''}">
+                      <span>${done ? '✅ Completed (+' + starVal + ' ⭐)' : '⬜ Mark Done (+' + starVal + ' ⭐)'}</span>
+                    </button>
+                  </div>
+                `;
+              }
+
+              return `
+                <div class="rounded-2xl p-3 ${isGolden ? 'golden-chore-card' : 'bg-slate-50/90 border border-slate-200/70'}">
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <div class="flex flex-wrap items-center gap-1.5">
+                        ${isGolden ? `<span class="px-2 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-extrabold uppercase tracking-wider shadow-2xs">✨ Golden Chore</span>` : ''}
+                        <p class="text-xs sm:text-sm font-extrabold text-slate-900">${esc(c.title)}</p>
+                      </div>
+                      <p class="text-[11px] font-bold ${isGolden ? 'text-amber-800' : 'text-slate-500'} mt-0.5">
+                        🔁 ${esc(repLabel)} · +${starVal} ⭐ per tick ${isGolden ? `(${Number(c.stars || 1)} + 2 bonus!)` : ''}
+                      </p>
+                    </div>
+                    ${isParent ? `
+                      <div class="flex items-center gap-1 shrink-0">
+                        <button type="button" onclick="toggleChoreGolden('${c.id}')" title="Toggle Golden Chore (+2 Bonus Stars)" class="tap px-2 py-1 rounded-lg text-xs font-extrabold ${isGolden ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-700 border border-amber-200'}">✨</button>
+                        <button type="button" onclick="deleteChore('${c.id}')" class="tap px-2 py-1 rounded-lg bg-rose-50 text-rose-700 text-xs font-extrabold">✕</button>
+                      </div>
+                    ` : ''}
+                  </div>
+                  ${controlHtml}
+                </div>
+              `;
+            }).join('');
+
+        return `
+          <div class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-2xs space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl text-white text-2xl flex items-center justify-center shadow-2xs" style="background:${kid.color}">${kid.icon}</div>
+                <div>
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <h3 class="text-base font-extrabold text-slate-900">${esc(kid.name)}</h3>
+                    ${stars >= 10 ? `<button type="button" onclick="manualCelebrateKid('${kid.id}')" class="tap px-2 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-extrabold">🏆 10-Star Club · 🎉</button>` : ''}
+                  </div>
+                  <p class="text-xs font-extrabold" style="color:${kid.color}">${stars} / 10 ⭐ ${stars >= 10 ? '· Pocket Money Unlocked!' : ''}</p>
+                </div>
+              </div>
+              ${isParent ? `
+                <div class="flex items-center gap-1">
+                  <button type="button" onclick="adjustBonusStars('${kid.id}', -1)" class="tap px-2 py-1 rounded-xl bg-rose-50 text-rose-700 text-xs font-extrabold">-1 ⭐</button>
+                  <button type="button" onclick="adjustBonusStars('${kid.id}', 1)" class="tap px-2 py-1 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-extrabold">+1 ⭐</button>
+                  <button type="button" onclick="adjustBonusStars('${kid.id}', 2)" class="tap px-2 py-1 rounded-xl bg-amber-50 text-amber-800 text-xs font-extrabold">+2 ⭐</button>
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="w-full h-3 rounded-full bg-slate-100 overflow-hidden p-0.5 border border-slate-200/60">
+              <div class="h-full rounded-full transition-all duration-300" style="width:${pct}%; background:${stars >= 10 ? '#f59e0b' : kid.color}"></div>
+            </div>
+
+            <div class="space-y-2">${choresHtml}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setChoreKidFilter(kidId) {
+      if (!currentUser || currentUser.role !== 'parent') {
+        selectedChoreKidFilter = currentUser ? currentUser.id : 'all';
+        renderChores();
+        return;
+      }
+      selectedChoreKidFilter = kidId;
+      renderChores();
+    }
+
+    function addNewChore(e) {
+      e.preventDefault();
+      if (!currentUser || currentUser.role !== 'parent') return;
+      const title = document.getElementById('choreTitleInput').value.trim();
+      const kidId = document.getElementById('choreKidSelect').value;
+      const repeat = document.getElementById('choreRepeatSelect').value;
+      const stars = Math.max(1, Math.min(10, parseInt(document.getElementById('choreStarsInput').value || '1', 10)));
+      const golden = document.getElementById('choreGoldenCheckbox').checked === true;
+      if (!title) return;
+
+      state.chores.push({
+        id: 'ch_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        kidId,
+        title,
+        repeat,
+        stars,
+        golden,
+        specificDays: repeat === 'specific' ? [...selectedChoreSpecificDays] : [],
+        ticks: {}
+      });
+      document.getElementById('choreTitleInput').value = '';
+      document.getElementById('choreGoldenCheckbox').checked = false;
+      playSoundEffect('pop');
+      persistState();
+      renderChores();
+      const kid = getProfile(kidId);
+      showToast(`${golden ? '✨ Golden Chore' : '⭐'} assigned to ${kid ? kid.name : 'kid'}`);
+    }
+
+    function toggleChoreGolden(choreId) {
+      if (!currentUser || currentUser.role !== 'parent') return;
+      const ch = state.chores.find(c => c.id === choreId);
+      if (!ch) return;
+      const prevStars = calculateKidStars(ch.kidId);
+      ch.golden = !ch.golden;
+      playSoundEffect('pop');
+      checkAndTriggerTenStarCelebration(ch.kidId, prevStars);
+      persistState();
+      renderChores();
+      showToast(ch.golden ? "✨ Upgraded to Golden Chore (+2 Bonus Stars)!" : "Reverted to regular chore");
+    }
+
+    function toggleChoreDayTick(choreId, dow) {
+      const ch = state.chores.find(c => c.id === choreId);
+      if (!ch) return;
+      const prevStars = calculateKidStars(ch.kidId);
+      if (!ch.ticks) ch.ticks = {};
+      ch.ticks[`dow_${dow}`] = !ch.ticks[`dow_${dow}`];
+      playSoundEffect('chime');
+      checkAndTriggerTenStarCelebration(ch.kidId, prevStars);
+      persistState();
+      renderChores();
+    }
+
+    function toggleSingleChoreTick(choreId) {
+      const ch = state.chores.find(c => c.id === choreId);
+      if (!ch) return;
+      const prevStars = calculateKidStars(ch.kidId);
+      if (!ch.ticks) ch.ticks = {};
+      ch.ticks.done = !ch.ticks.done;
+      playSoundEffect('chime');
+      checkAndTriggerTenStarCelebration(ch.kidId, prevStars);
+      persistState();
+      renderChores();
+    }
+
+    function adjustBonusStars(kidId, delta) {
+      if (!currentUser || currentUser.role !== 'parent') return;
+      const prevStars = calculateKidStars(kidId);
+      if (!state.bonusStars) state.bonusStars = {};
+      state.bonusStars[kidId] = Math.max(0, Number(state.bonusStars[kidId] || 0) + delta);
+      playSoundEffect('chime');
+      checkAndTriggerTenStarCelebration(kidId, prevStars);
+      persistState();
+      renderChores();
+    }
+
+    function deleteChore(choreId) {
+      if (!currentUser || currentUser.role !== 'parent') return;
+      state.chores = state.chores.filter(c => c.id !== choreId);
+      persistState();
+      renderChores();
+    }
+
+    function clearAllChores() {
+      if (!currentUser || currentUser.role !== 'parent') return;
+      state.chores = [];
+      persistState();
+      renderChores();
+      showToast("🗑️ All chores cleared");
+    }
+
+    function manualResetWeek() {
+      if (!currentUser || currentUser.role !== 'parent') return;
+      state.cycleStartISO = getCycleStartISO(new Date());
+      state.bonusStars = { gracie: 0, bella: 0, jack: 0, elsie: 0, teddy: 0 };
+      state.celebratedTenStars = {};
+      state.chores = state.chores
+        .filter(c => !(c.repeat === 'once' && c.ticks && c.ticks.done))
+        .map(c => ({ ...c, ticks: {} }));
+      persistState();
+      renderChores();
+      showToast("🔄 New Fri–Thu star cycle started!");
+    }
+
+    // 13. TAB 4: SHOP (SHARED SHOPPING LIST — NO CATEGORIES)
+    function renderShopping() {
+      const neededItems = state.shopping.filter(item => !item.ticked);
+      const tickedItems = state.shopping.filter(item => item.ticked);
+
+      const neededBadge = document.getElementById('shopNeededBadge');
+      if (neededBadge) neededBadge.textContent = `${neededItems.length} needed`;
+
+      const navShopBadge = document.getElementById('navShopCountBadge');
+      if (navShopBadge) {
+        if (neededItems.length > 0) {
+          navShopBadge.textContent = neededItems.length > 99 ? '99+' : String(neededItems.length);
+          navShopBadge.classList.remove('hidden');
+        } else {
+          navShopBadge.classList.add('hidden');
+        }
+      }
+
+      const stapleBox = document.getElementById('shopStaplePills');
+      if (stapleBox) {
+        stapleBox.innerHTML = SHOP_STAPLES.map(st => {
+          const alreadyNeeded = neededItems.some(i => i.text.toLowerCase() === st.label.toLowerCase());
+          return `
+            <button type="button" onclick="quickAddStaple('${esc(st.label)}')" class="tap px-3 py-1.5 rounded-full border text-xs font-extrabold flex items-center gap-1.5 ${alreadyNeeded ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'}">
+              <span>${st.icon}</span>
+              <span>${esc(st.label)}</span>
+              <span class="text-[10px] opacity-75">${alreadyNeeded ? '✓' : '+'}</span>
+            </button>
+          `;
+        }).join('');
+      }
+
+      const neededListEl = document.getElementById('shopNeededList');
+      if (neededListEl) {
+        if (!neededItems.length) {
+          neededListEl.innerHTML = `<div class="bg-white rounded-3xl p-8 text-center border border-slate-200/80 text-xs font-semibold text-slate-400">Shopping list is empty—tap a staple above or add something below!</div>`;
+        } else {
+          neededListEl.innerHTML = [...neededItems].reverse().map(item => {
+            const addedBy = getProfile(item.addedById) || { name: 'Family', color: '#475569', soft: '#f1f5f9' };
+            return `
+              <div class="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3">
+                <button type="button" onclick="toggleShoppingTick('${item.id}')" class="tap flex items-center gap-3 min-w-0 flex-1 text-left">
+                  <span class="w-7 h-7 rounded-xl border-2 border-slate-300 bg-slate-50 flex items-center justify-center shrink-0"></span>
+                  <div class="min-w-0">
+                    <p class="font-extrabold text-sm text-slate-900 truncate">${esc(item.text)}</p>
+                    <span class="inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full mt-0.5" style="background:${addedBy.soft};color:${addedBy.color}">Added by ${esc(addedBy.name)}</span>
+                  </div>
+                </button>
+                <button type="button" onclick="deleteShoppingItem('${item.id}')" class="tap px-2.5 py-1.5 rounded-xl bg-rose-50 text-rose-700 text-xs font-extrabold shrink-0">✕</button>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      const trolleyWrap = document.getElementById('shopTrolleyWrap');
+      const trolleyTitle = document.getElementById('shopTrolleyTitle');
+      const trolleyListEl = document.getElementById('shopTrolleyList');
+      if (trolleyWrap && trolleyListEl) {
+        if (!tickedItems.length) {
+          trolleyWrap.classList.add('hidden');
+        } else {
+          trolleyWrap.classList.remove('hidden');
+          if (trolleyTitle) trolleyTitle.textContent = `✅ In the Trolley (${tickedItems.length})`;
+          trolleyListEl.innerHTML = [...tickedItems].reverse().map(item => {
+            const addedBy = getProfile(item.addedById) || { name: 'Family' };
+            return `
+              <div class="bg-slate-100/90 rounded-2xl p-3 border border-slate-200/70 flex items-center justify-between gap-3 opacity-80">
+                <button type="button" onclick="toggleShoppingTick('${item.id}')" class="tap flex items-center gap-3 min-w-0 flex-1 text-left">
+                  <span class="w-7 h-7 rounded-xl bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0">✓</span>
+                  <div class="min-w-0">
+                    <p class="font-bold text-sm text-slate-500 line-through truncate">${esc(item.text)}</p>
+                    <p class="text-[10px] font-semibold text-slate-400">Added by ${esc(addedBy.name)}</p>
+                  </div>
+                </button>
+                <button type="button" onclick="deleteShoppingItem('${item.id}')" class="tap px-2 py-1 rounded-lg text-slate-400 hover:text-rose-600 text-xs font-extrabold shrink-0">✕</button>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+    }
+
+    function quickAddStaple(label) {
+      if (!currentUser) return;
+      const existing = state.shopping.find(i => !i.ticked && i.text.toLowerCase() === label.toLowerCase());
+      if (existing) {
+        showToast(`🛒 ${label} is already on the list`);
+        return;
+      }
+      state.shopping.push({
+        id: 'shop_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        text: label,
+        addedById: currentUser.id,
+        ticked: false,
+        ts: Date.now()
+      });
+      playSoundEffect('pop');
+      persistState();
+      renderShopping();
+      showToast(`🛒 Added ${label}`);
+    }
+
+    function addShoppingItem(e) {
+      e.preventDefault();
+      if (!currentUser) return;
+      const input = document.getElementById('shopItemInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      state.shopping.push({
+        id: 'shop_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        text,
+        addedById: currentUser.id,
+        ticked: false,
+        ts: Date.now()
+      });
+      input.value = '';
+      playSoundEffect('pop');
+      persistState();
+      renderShopping();
+      showToast(`🛒 Added "${text}"`);
+    }
+
+    function toggleShoppingTick(itemId) {
+      const item = state.shopping.find(i => i.id === itemId);
+      if (!item) return;
+      item.ticked = !item.ticked;
+      playSoundEffect('pop');
+      persistState();
+      renderShopping();
+    }
+
+    function deleteShoppingItem(itemId) {
+      state.shopping = state.shopping.filter(i => i.id !== itemId);
+      persistState();
+      renderShopping();
+    }
+
+    function clearTickedShopping() {
+      state.shopping = state.shopping.filter(i => !i.ticked);
+      persistState();
+      renderShopping();
+      showToast("🧹 Cleared trolley items");
+    }
+
+    // 14. TAB 5: REQUESTS (BIRTHDAY / CHRISTMAS / CLOTHING / SCHOOL / OTHER + 7-DAY DECLINE PURGE)
+    function selectRequestType(typeId) {
+      selectedRequestType = typeId;
+      playSoundEffect('pop');
+      renderRequestTypePills();
+    }
+
+    function renderRequestTypePills() {
+      const box = document.getElementById('requestTypePills');
+      if (!box) return;
+      box.innerHTML = REQUEST_TYPES.map(t => {
+        const active = selectedRequestType === t.id;
+        return `
+          <button type="button" onclick="selectRequestType('${t.id}')" class="tap px-3 py-1.5 rounded-full border text-xs font-extrabold flex items-center gap-1.5 ${active ? 'bg-accent text-white border-accent shadow-2xs' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-white'}">
+            <span>${t.icon}</span>
+            <span>${esc(t.label)}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function setRequestStatusFilter(statusId) {
+      selectedRequestStatusFilter = statusId;
+      renderRequests();
+    }
+
+    function getDeclinedDaysRemaining(declinedAt) {
+      const elapsed = Date.now() - Number(declinedAt || Date.now());
+      const remainingMs = Math.max(0, SEVEN_DAYS_MS - elapsed);
+      const daysLeft = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+      return Math.max(1, daysLeft);
+    }
+
+    function renderRequests() {
+      if (!currentUser) return;
+
+      const { kept, removedAny } = purgeExpiredDeclinedRequests(state.requests);
+      if (removedAny) {
+        state.requests = kept;
+        persistState();
+      }
+
+      renderRequestTypePills();
+
+      const isParent = currentUser.role === 'parent';
+      const baseRequests = isParent ? state.requests : state.requests.filter(r => r.kidId === currentUser.id);
+      const pendingCount = baseRequests.filter(r => r.status === 'pending').length;
+
+      const badge = document.getElementById('pendingReqBadge');
+      if (badge) badge.textContent = `${pendingCount} pending`;
+
+      const navBadge = document.getElementById('navReqBadge');
+      if (navBadge) {
+        if (pendingCount > 0) {
+          navBadge.textContent = String(pendingCount);
+          navBadge.classList.remove('hidden');
+        } else {
+          navBadge.classList.add('hidden');
+        }
+      }
+
+      const filterRow = document.getElementById('requestFilterRow');
+      if (filterRow) {
+        const filters = [
+          { id: 'all',      label: `All (${baseRequests.length})` },
+          { id: 'pending',  label: `⏳ Pending (${baseRequests.filter(r => r.status === 'pending').length})` },
+          { id: 'saved',    label: `🔖 Saved (${baseRequests.filter(r => r.status === 'saved').length})` },
+          { id: 'approved', label: `✅ Approved (${baseRequests.filter(r => r.status === 'approved').length})` },
+          { id: 'declined', label: `❌ Declined (${baseRequests.filter(r => r.status === 'declined').length})` }
+        ];
+        filterRow.innerHTML = filters.map(f => {
+          const active = selectedRequestStatusFilter === f.id;
+          return `
+            <button type="button" onclick="setRequestStatusFilter('${f.id}')" class="tap px-3 py-1.5 rounded-full text-xs font-extrabold shrink-0 ${active ? 'bg-accent text-white shadow-2xs' : 'bg-white text-slate-600 border border-slate-200'}">
+              ${f.label}
+            </button>
+          `;
+        }).join('');
+      }
+
+      const list = document.getElementById('requestsList');
+      if (!list) return;
+
+      const filtered = selectedRequestStatusFilter === 'all'
+        ? baseRequests
+        : baseRequests.filter(r => r.status === selectedRequestStatusFilter);
+
+      if (!filtered.length) {
+        list.innerHTML = `<div class="bg-white rounded-3xl p-8 text-center border border-slate-200/80 text-xs font-semibold text-slate-400">No requests in this view yet.</div>`;
+        return;
+      }
+
+      list.innerHTML = [...filtered].reverse().map(r => {
+        const sender = getProfile(r.kidId) || { name: 'Family', icon: '🙋', color: '#475569', soft: '#f1f5f9' };
+        const typeMeta = REQUEST_TYPES.find(t => t.id === r.type) || REQUEST_TYPES[4];
+        const dateStr = new Date(r.ts || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+        let statusPill = `<span class="text-[11px] font-extrabold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 shrink-0">⏳ Pending</span>`;
+        if (r.status === 'approved') {
+          statusPill = `<span class="text-[11px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 shrink-0">✅ Approved</span>`;
+        } else if (r.status === 'saved') {
+          statusPill = `<span class="text-[11px] font-extrabold px-2.5 py-1 rounded-full bg-sky-100 text-sky-800 shrink-0">🔖 Saved for later</span>`;
+        } else if (r.status === 'declined') {
+          const daysLeft = getDeclinedDaysRemaining(r.declinedAt);
+          statusPill = `<span class="text-[11px] font-extrabold px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 shrink-0">❌ Declined · deletes in ${daysLeft}d</span>`;
+        }
+
+        const noteHtml = r.note
+          ? (/^https?:\/\//i.test(r.note.trim())
+              ? `<a href="${esc(r.note.trim())}" target="_blank" rel="noopener noreferrer" class="inline-block text-xs font-bold text-sky-700 underline break-all mt-1">🔗 ${esc(r.note.trim())}</a>`
+              : `<p class="text-xs font-medium text-slate-600 bg-slate-50 rounded-xl px-3 py-2 border border-slate-200/70 mt-1.5 break-words">${esc(r.note)}</p>`)
+          : '';
+
+        const parentActionsHtml = isParent ? `
+          <div class="flex flex-wrap items-center justify-between gap-1.5 pt-2.5 border-t border-slate-100">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <button type="button" onclick="updateRequestStatus('${r.id}', 'approved')" class="tap px-3 py-1.5 rounded-xl text-xs font-extrabold ${r.status === 'approved' ? 'bg-emerald-700 text-white ring-2 ring-emerald-300' : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'}">✅ Approve</button>
+              <button type="button" onclick="updateRequestStatus('${r.id}', 'saved')" class="tap px-3 py-1.5 rounded-xl text-xs font-extrabold ${r.status === 'saved' ? 'bg-sky-700 text-white ring-2 ring-sky-300' : 'bg-sky-50 text-sky-800 border border-sky-200 hover:bg-sky-100'}">🔖 Save for later</button>
+              <button type="button" onclick="updateRequestStatus('${r.id}', 'declined')" class="tap px-3 py-1.5 rounded-xl text-xs font-extrabold ${r.status === 'declined' ? 'bg-rose-700 text-white ring-2 ring-rose-300' : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'}">❌ Decline</button>
+            </div>
+            <button type="button" onclick="deleteRequest('${r.id}')" title="Delete now" class="tap px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 text-xs font-extrabold">🗑️</button>
+          </div>
+        ` : '';
+
+        return `
+          <div class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-2xs space-y-2.5 ${r.status === 'declined' ? 'opacity-85' : ''}">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-start gap-2.5 min-w-0">
+                <div class="w-10 h-10 rounded-2xl text-white text-lg flex items-center justify-center shrink-0 shadow-2xs" style="background:${sender.color}">${sender.icon}</div>
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="text-xs font-extrabold" style="color:${sender.color}">${esc(sender.name)}</span>
+                    <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full" style="background:${typeMeta.badgeBg};color:${typeMeta.badgeText}">${typeMeta.icon} ${esc(typeMeta.label)}</span>
+                    <span class="text-[10px] font-semibold text-slate-400">${dateStr}</span>
+                  </div>
+                  <p class="text-sm font-extrabold text-slate-900 mt-1 break-words">${esc(r.title)}</p>
+                  ${noteHtml}
+                </div>
+              </div>
+              ${statusPill}
+            </div>
+            ${parentActionsHtml}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function submitRequest(e) {
+      e.preventDefault();
+      if (!currentUser) return;
+      const titleInput = document.getElementById('requestTitleInput');
+      const noteInput = document.getElementById('requestNoteInput');
+      const title = titleInput.value.trim();
+      const note = noteInput ? noteInput.value.trim() : '';
+      if (!title) return;
+
+      state.requests.push({
+        id: 'req_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        kidId: currentUser.id,
+        type: selectedRequestType || 'Other',
+        title,
+        note,
+        status: 'pending',
+        declinedAt: null,
+        ts: Date.now()
+      });
+      titleInput.value = '';
+      if (noteInput) noteInput.value = '';
+      playSoundEffect('chime');
+      persistState();
+      renderRequests();
+      showToast(`🙋 ${selectedRequestType} request sent!`);
+    }
+
+    function updateRequestStatus(reqId, status) {
+      if (!currentUser || currentUser.role !== 'parent') return;
+      const req = state.requests.find(r => r.id === reqId);
+      if (!req) return;
+      req.status = status;
+      req.declinedAt = status === 'declined' ? Date.now() : null;
+      playSoundEffect('chime');
+      persistState();
+      renderRequests();
+      if (status === 'approved') showToast("✅ Request approved!");
+      else if (status === 'saved') showToast("🔖 Saved for later!");
+      else if (status === 'declined') showToast("❌ Declined (auto-deletes in 7 days)");
+    }
+
+    function deleteRequest(reqId) {
+      if (!currentUser || currentUser.role !== 'parent') return;
+      state.requests = state.requests.filter(r => r.id !== reqId);
+      persistState();
+      renderRequests();
+      showToast("🗑️ Request deleted");
+    }
+
+    // 15. TAB 6: BIRTHDAYS
+    function renderBirthdays() {
+      const list = document.getElementById('birthdaysList');
+      if (!list) return;
+      list.innerHTML = getUpcomingBirthdaysList().map(item => {
+        const dateLabel = item.next.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+        const countdown = item.daysAway === 0 ? '🎉 TODAY!' : item.daysAway === 1 ? 'Tomorrow!' : `In ${item.daysAway} days`;
+        return `
+          <div class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-2xl text-white text-2xl flex items-center justify-center shadow-2xs" style="background:${item.color}">${item.icon}</div>
+              <div>
+                <p class="font-extrabold text-sm sm:text-base text-slate-900">${esc(item.name)}</p>
+                <p class="text-xs font-semibold text-slate-500">${dateLabel} · Turning <span class="font-extrabold text-slate-700">${item.turningAge}</span></p>
+              </div>
+            </div>
+            <span class="text-xs font-extrabold px-3 py-1.5 rounded-full" style="background:${item.soft};color:${item.color}">${countdown}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 16. HELPERS & BOOTSTRAP
+    function esc(str) {
+      return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('toastBanner');
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.add('hidden'), 3200);
+    }
+
+    function renderAll() {
+      applySeasonalAmbient();
+      populateDynamicProfileSelects();
+      updateMuteButtonUI();
+      if (!currentUser) {
+        renderLogin();
+        return;
+      }
+      renderSpotlights();
+      renderGreetingBanner();
+      renderChat();
+      renderSchedule();
+      renderChores();
+      renderShopping();
+      renderRequests();
+      renderBirthdays();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      renderLogin();
+      initRealtimeSync();
+      applySeasonalAmbient();
+
+      const savedUserId = localStorage.getItem('family_hq_last_user');
+      if (savedUserId) {
+        const prof = getProfile(savedUserId);
+        if (prof) loginAsProfile(prof);
+      }
+    });
+  </script>
+</body>
+</html>
